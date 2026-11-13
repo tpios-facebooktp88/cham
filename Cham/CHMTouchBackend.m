@@ -206,14 +206,19 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
 
     UIApplication *application = UIApplication.sharedApplication;
     if (isDown) {
+        // Cham's handle, panel, and point markers are overlays on this same
+        // UIWindow. Temporarily hide all tagged overlay roots so the touch is
+        // associated with the underlying application view, not Cham itself.
+        NSMutableArray<UIView *> *hiddenOverlayViews = [NSMutableArray array];
+        for (UIView *subview in window.subviews) {
+            if (subview.tag == 0x43484D && !subview.hidden) {
+                subview.hidden = YES;
+                [hiddenOverlayViews addObject:subview];
+            }
+        }
         hitView = [window hitTest:point withEvent:nil];
-        // Hit testing returns the marker's child label, so walk up to its root.
-        UIView *marker = hitView;
-        while (marker && marker.tag != 0x43484D) marker = marker.superview;
-        if (marker) {
-            marker.hidden = YES;
-            hitView = [window hitTest:point withEvent:nil];
-            marker.hidden = NO;
+        for (UIView *overlayView in hiddenOverlayViews) {
+            overlayView.hidden = NO;
         }
         hitView = hitView ?: window.rootViewController.view;
     }
