@@ -167,7 +167,7 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
         hitView = backend.activeView;
         contextID = backend.activeContextID;
         point = backend.activePoint;
-        if (!backend.activeTouch || !window || !hitView || hitView.window != window) {
+        if (!backend.activeTouch || !window || !hitView) {
             CHMSetError(error, 16, @"The original touch window or view is no longer valid; UP was not dispatched.");
             return NO;
         }
