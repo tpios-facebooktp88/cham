@@ -1,4 +1,5 @@
 #import "CHMOverlay.h"
+#import <math.h>
 #import "CHMTapScheduler.h"
 
 static NSString * const CHMSettingsKey = @"com.cham.autoclicker.settings.v1";
