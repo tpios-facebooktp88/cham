@@ -430,3 +430,12 @@ Re-fetched the committed source from GitHub and verified all eight expected ABI,
 - The exact ABI order is supported by the saved decompiled call site, but must still be validated by compiling and testing on the target iOS 16 environment.
 - `IOHIDEventSystemClientDispatchEvent` and UIApplication's private enqueue method do not provide an application-level delivery acknowledgement. A successful return from the local backend is not proof that the target app received the touch.
 - If the corrected build still does not touch, the next required evidence is the in-app diagnostic output for each stage: symbol resolution, parent event creation, finger event creation, window-to-screen coordinates, context ID/BKS metadata availability, UIKit enqueue selector availability, and dispatch invocation. Do not add another HID API blindly.
+
+
+## UIKit event delivery correction — 2026-11-13
+
+- Re-fetched the current `main` implementation and compared it with the saved REA baseline for `fakeTouchId:AtScreenPoint:inWindow:withTouchPhase:force:radius:`.
+- The backend already created/populated `UITouch` and `UIEvent`, attached the HID event, cleared/added the touch, and invoked the alternate HID enqueue/dispatch calls, but it did not invoke `UIApplication.sendEvent:`.
+- The REA baseline explicitly records that the original UIKit path iterates tracked touches, adds them to the event, and calls `UIApplication.sendEvent:`. Added the missing `[application sendEvent:touchEvent]` immediately after `_addTouch:forDelayedDelivery:`.
+- No timing code, mode behavior, original `Cham.dylib`, or Makefile framework list was changed. The Makefile currently links UIKit and Foundation; IOKit symbols are dynamically resolved with `dlopen/dlsym`, so adding `-framework IOKit` is not required by this implementation.
+- This is an evidence-based source correction, not proof of OS-level touch delivery. The coexistence/branch relationship between the UIKit send path and alternate HID dispatch path still needs iOS 16 device validation. No build, Actions run, or injection test was performed.
