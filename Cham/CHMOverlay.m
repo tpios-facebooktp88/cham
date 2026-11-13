@@ -142,12 +142,23 @@ static NSInteger const CHMOverlayTag = 0x43484D;
         [savedPoints addObject:@{@"x": @(point.x), @"y": @(point.y)}];
     }
 
+    NSDictionary *previous = [NSUserDefaults.standardUserDefaults dictionaryForKey:CHMSettingsKey] ?: @{};
+    CGFloat defaultX = CGRectGetMidX(self.hostWindow.bounds);
+    CGFloat defaultY = CGRectGetMidY(self.hostWindow.bounds);
+    NSNumber *savedX = self.xField ? @(self.xField.text.doubleValue) : (previous[@"x"] ?: @(defaultX));
+    NSNumber *savedY = self.yField ? @(self.yField.text.doubleValue) : (previous[@"y"] ?: @(defaultY));
+    NSNumber *savedInterval = self.intervalField
+        ? @(MAX(0.01, self.intervalField.text.doubleValue))
+        : (previous[@"interval"] ?: @0.5);
+    NSNumber *savedTouchTime = self.touchTimeSlider
+        ? @(self.touchTimeSlider.value)
+        : (previous[@"touchTime"] ?: @60.0);
     NSMutableDictionary *settings = [@{
         @"points": savedPoints,
-        @"x": @(self.xField.text.doubleValue),
-        @"y": @(self.yField.text.doubleValue),
-        @"interval": @(MAX(0.01, self.intervalField.text.doubleValue)),
-        @"touchTime": @(self.touchTimeSlider ? self.touchTimeSlider.value : 60.0),
+        @"x": savedX,
+        @"y": savedY,
+        @"interval": savedInterval,
+        @"touchTime": savedTouchTime,
         @"handleX": @(self.handle.frame.origin.x),
         @"handleY": @(self.handle.frame.origin.y),
         @"panelScale": @(self.panelScale)
@@ -370,6 +381,10 @@ static NSInteger const CHMOverlayTag = 0x43484D;
         self.xField.text = [NSString stringWithFormat:@"%.0f", center.x];
         self.yField.text = [NSString stringWithFormat:@"%.0f", center.y];
         [self saveSettings];
+        NSMutableDictionary *settings = [[NSUserDefaults.standardUserDefaults dictionaryForKey:CHMSettingsKey] mutableCopy] ?: [NSMutableDictionary dictionary];
+        settings[@"x"] = @(center.x);
+        settings[@"y"] = @(center.y);
+        [NSUserDefaults.standardUserDefaults setObject:settings forKey:CHMSettingsKey];
     }
 }
 
