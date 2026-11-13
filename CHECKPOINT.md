@@ -448,3 +448,33 @@ Re-fetched the committed source from GitHub and verified all eight expected ABI,
 - Corrected `IOHIDEventCreateDigitizerFingerEvent` to the 13-argument ABI: allocator, timestamp, index, identity, event mask, x/y/z, tip pressure, twist, range, touch, options.
 - Kept the existing intended values (parent transducer type 3; finger index/identity 1; event mask 0x27; existing coordinates, force, range/touch flags). No scheduler timing, overlay, framework list, or original `Cham.dylib` changes.
 - ABI signatures cross-checked against the public IOKit header and WebKit's iOS HID event generator. Static source correction only; no build or iOS 16 runtime test was run. This does not yet prove event delivery.
+
+## Device milestone: POINT click confirmed — 2026-11-13
+
+<badge>DEVICE TEST PASSED</badge>
+
+The user built the latest `main` and confirmed that the synthetic POINT touch now produces a real click on the target device. This is the first confirmed app-level touch-delivery milestone; the earlier source-only checks did not establish this.
+
+### Changes present in the working build
+
+1. **Corrected the IOKit digitizer constructor ABI** — commit `398054e930f13b5e8922deca849e2f292f09757f`.
+   - `IOHIDEventCreateDigitizerEvent` now uses the correct 15-argument signature and order: allocator, timestamp, digitizer metadata, coordinates/pressure, range/touch, options.
+   - `IOHIDEventCreateDigitizerFingerEvent` now uses the correct 13-argument signature and order: allocator, timestamp, finger metadata, coordinates/pressure, range/touch, options.
+   - Updated both function-pointer typedefs and both constructor calls. The previous argument order was wrong, so the dynamically resolved functions were being called with an ABI mismatch. This was the critical correction immediately preceding the successful device test.
+
+2. **Added explicit UIKit event delivery** — commit `9ea555e700861d35f6fb8af7d30862614665ec04`.
+   - After populating the `UITouch` and `UIEvent`, the backend now calls `[application sendEvent:touchEvent]`.
+   - This was already present in the successful build. The device test confirms the combined implementation works; it does not independently prove whether this call or the ABI correction alone was sufficient.
+
+### Confirmed scope
+
+- Confirmed by user: POINT mode can click on the target device.
+- The successful build includes both the UIKit `sendEvent:` delivery addition and the corrected IOKit constructor ABI.
+- No claim yet for DOUBLE, HOLD, HUMAN, EXTREME, ULTRA, multi-point, recorder, or OCR.
+- No timing values were changed in this fix.
+- Original `Cham.dylib` remains untouched.
+- No GitHub Actions, Codemagic, or assistant-run build was used for this milestone; the user built and tested.
+
+### Next validation
+
+Use this commit as the known-good touch-delivery baseline. Keep the backend constructor ABI and UIKit `sendEvent:` path unchanged while validating the remaining Tap modes. If a later change breaks POINT, compare against this exact milestone first.
