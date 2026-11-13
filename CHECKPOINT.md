@@ -478,3 +478,39 @@ The user built the latest `main` and confirmed that the synthetic POINT touch no
 ### Next validation
 
 Use this commit as the known-good touch-delivery baseline. Keep the backend constructor ABI and UIKit `sendEvent:` path unchanged while validating the remaining Tap modes. If a later change breaks POINT, compare against this exact milestone first.
+
+## POINT-only cleanup, persistent settings, and UI refresh — 2026-11-13
+
+### User-approved scope
+
+The user confirmed that only POINT mode is currently needed. Other Tap modes and unfinished feature scaffolding should be removed rather than maintained speculatively. Preserve the already device-confirmed POINT touch backend and let the user run builds/tests.
+
+### Changes committed on `main`
+
+- Simplified `CHMTapScheduler` to a POINT-only cycle: configured point sequence, DOWN, press duration, UP, then interval. Removed mode enum/selection, DOUBLE/HOLD/HUMAN/EXTREME/ULTRA branches, double-tap gap, random timing, and unused repeat-count/cycle state.
+- Kept multiple configured POINT coordinates. This is still POINT mode; no alternate tap modes remain.
+- Reworked `CHMOverlay.m` into a compact dark panel with a blue-violet accent, clearer coordinate fields, interval, press-duration slider, point controls, and prominent START/STOP controls.
+- Added automatic persistence with `NSUserDefaults`: coordinate fields, point list, interval, press duration, floating handle position, panel position, and panel scale are saved as settings change and restored when the tweak attaches / panel reopens.
+- Removed the unused OCR text-matcher source files and removed them from `Makefile`. OCR was only a standalone matching primitive, not a complete Vision OCR workflow.
+- Updated README to describe the actual POINT-only scope and distinguish the previous device-tested touch baseline from the new source changes awaiting user build/test.
+- Did not change `CHMTouchBackend`, IOKit constructor ABI, UIKit `sendEvent:` delivery, DOWN/UP safety handling, or the original `Cham.dylib`.
+
+### Source commits
+
+- Scheduler header: `95da3549707e27853a87f339c9419ef1978ad1c0`
+- Scheduler implementation: `ab06cf968ae8fa2c506064f5608919ce57efd108`
+- Overlay redesign and persistence: `1d5385225a6052dba47610a0abb3aaa34efce9f3`
+- Preserve pre-panel settings defaults: `276e0d3e5b58b397c46f2f94365b3a884d2e7392`
+- Makefile OCR removal: `b4b79feda2936067bb1d5324fd007b68a63f7d74`
+- README scope update: `5d0e831e89192deeb3bf02f255e3eab8b59704c9`
+- Delete unused OCR matcher header: `958535503f6b5d11ee00fe7a90ec12db061b8f17`
+- Delete unused OCR matcher implementation: `05f5c662b2136345f118f81633219acd95da09bf`
+
+### Validation boundary
+
+- Changes were committed directly to `main`; no branch was created.
+- No build, GitHub Actions, Codemagic, Theos compile, or device test was run.
+- Static source review still needs a final pass for references to removed OCR/mode symbols and persistence paths.
+- User must build this revision and test: POINT click, STOP/release, saved coordinates and point list after closing/reopening the panel, and settings after terminating/relaunching the app.
+- Do not mark the refreshed UI/persistence as device-verified until the user confirms it.
+- The previous confirmed working touch baseline remains `398054e`; if POINT stops working, compare the backend against that exact baseline before changing touch logic.
