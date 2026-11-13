@@ -293,7 +293,7 @@ static NSInteger const CHMOverlayTag = 0x43484D;
     [self.touchTimeSlider addTarget:self action:@selector(touchTimeChanged:) forControlEvents:UIControlEventValueChanged];
     [panel addSubview:self.touchTimeSlider];
     self.touchTimeLabel = [self label:[NSString stringWithFormat:@"%.1f ms", self.touchTimeSlider.value]
-                                frame:CGRectMake(width - 64, 174, 48, 18)];
+                                frame:CGRectMake(width - 64, 179, 48, 18)];
     self.touchTimeLabel.font = [UIFont systemFontOfSize:10.0 weight:UIFontWeightMedium];
     self.touchTimeLabel.textAlignment = NSTextAlignmentRight;
     self.touchTimeLabel.textColor = [UIColor colorWithWhite:1.0 alpha:0.72];
