@@ -149,6 +149,28 @@ jobs:
           run_rea research-output/search-ultra.json \
             rea search "$THIN_BINARY" "_ultraTapInWindow:" --provider ghidra --json
 
+          # Resolve references from Objective-C selector strings into method
+          # metadata and executable code, then retain pseudocode for review.
+          run_rea research-output/xrefs-fake-touch.json \
+            rea xrefs "$THIN_BINARY" 0x297f3 --provider ghidra --json
+          run_rea research-output/xrefs-fake-touch-prefer-system.json \
+            rea xrefs "$THIN_BINARY" 0x28baf --provider ghidra --json
+          run_rea research-output/xrefs-normal-tap.json \
+            rea xrefs "$THIN_BINARY" 0x28e07 --provider ghidra --json
+          run_rea research-output/xrefs-double-tap.json \
+            rea xrefs "$THIN_BINARY" 0x28ae1 --provider ghidra --json
+          run_rea research-output/xrefs-extreme.json \
+            rea xrefs "$THIN_BINARY" 0x28b08 --provider ghidra --json
+          run_rea research-output/xrefs-ultra.json \
+            rea xrefs "$THIN_BINARY" 0x291ad --provider ghidra --json
+          run_rea research-output/xrefs-smart-tap.json \
+            rea xrefs "$THIN_BINARY" 0x2a575 --provider ghidra --json
+
+          run_rea research-output/trace-fake-touch.json \
+            rea trace "$THIN_BINARY" "fakeTouchId:AtScreenPoint:inWindow:withTouchPhase:" --provider ghidra --json
+          run_rea research-output/trace-tap-modes.json \
+            rea trace "$THIN_BINARY" "smartTapAtScreenPoint:" --provider ghidra --json
+
       - name: Upload REA research reports
         if: always()
         uses: actions/upload-artifact@v4
