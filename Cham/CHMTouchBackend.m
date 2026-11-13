@@ -8,6 +8,34 @@
 typedef struct __IOHIDEvent *CHMIOHIDEventRef;
 typedef struct __IOHIDEventSystemClient *CHMIOHIDEventSystemClientRef;
 
+@interface UITouch (CHMPrivate)
+- (void)setWindow:(UIWindow *)window;
+- (void)setView:(UIView *)view;
+- (void)setGestureView:(UIView *)view;
+- (void)setTapCount:(NSUInteger)tapCount;
+- (void)setPhase:(UITouchPhase)phase;
+- (void)setTimestamp:(NSTimeInterval)timestamp;
+- (void)_setLocationInWindow:(CGPoint)point resetPrevious:(BOOL)resetPrevious;
+- (void)_setIsFirstTouchForView:(BOOL)firstTouch;
+- (void)setIsTap:(BOOL)isTap;
+- (void)_setHidEvent:(CHMIOHIDEventRef)event;
+@end
+
+@interface UIEvent (CHMPrivate)
+- (void)_clearTouches;
+- (void)_setHIDEvent:(CHMIOHIDEventRef)event;
+- (void)_setTimestamp:(NSTimeInterval)timestamp;
+- (void)_addTouch:(UITouch *)touch forDelayedDelivery:(BOOL)delayed;
+@end
+
+@interface UIApplication (CHMPrivate)
+- (UIEvent *)_touchesEvent;
+@end
+
+@interface CHMTouchBackend ()
+@property (nonatomic, strong) UITouch *activeTouch;
+@end
+
 typedef CHMIOHIDEventRef (*CHMCreateDigitizerEventFn)(
     CFAllocatorRef, uint64_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t,
     double, double, double, double, double, uint8_t, uint8_t, uint32_t);
@@ -89,7 +117,7 @@ static UIWindow *CHMActiveWindow(void) {
     return UIApplication.sharedApplication.keyWindow;
 }
 
-static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, NSError **error) {
+static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBackend *backend, NSError **error) {
     if (!NSThread.isMainThread) {
         CHMSetError(error, 4, @"HID touch events must be dispatched on the main thread.");
         return NO;
@@ -147,9 +175,63 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, NSError **er
     CHMSetFloatValue(finger, 0xB0031, radius * 0.8);
     CHMAppendEvent(parent, finger, 0);
 
+    UIApplication *application = UIApplication.sharedApplication;
+    UIView *hitView = [window hitTest:point withEvent:nil] ?: window.rootViewController.view;
+    UITouch *touch = backend.activeTouch;
+    if (!touch && phase == CHMTouchPhaseUp) {
+        CFRelease(finger);
+        CFRelease(parent);
+        CHMSetError(error, 11, @"Cannot end a touch that has no active UITouch object.");
+        return NO;
+    }
+    if (!hitView || ![application respondsToSelector:@selector(_touchesEvent)]) {
+        CFRelease(finger);
+        CFRelease(parent);
+        CHMSetError(error, 12, @"UIKit could not provide a hit-tested view or touch event.");
+        return NO;
+    }
+    if (!touch) touch = [[UITouch alloc] init];
+    UIEvent *touchEvent = [application _touchesEvent];
+    if (!touch || !touchEvent ||
+        ![touch respondsToSelector:@selector(setWindow:)] ||
+        ![touch respondsToSelector:@selector(setView:)] ||
+        ![touch respondsToSelector:@selector(setTapCount:)] ||
+        ![touch respondsToSelector:@selector(setPhase:)] ||
+        ![touch respondsToSelector:@selector(setTimestamp:)] ||
+        ![touch respondsToSelector:@selector(_setLocationInWindow:resetPrevious:)] ||
+        ![touch respondsToSelector:@selector(_setIsFirstTouchForView:)] ||
+        ![touch respondsToSelector:@selector(_setHidEvent:)] ||
+        ![touchEvent respondsToSelector:@selector(_clearTouches)] ||
+        ![touchEvent respondsToSelector:@selector(_setHIDEvent:)] ||
+        ![touchEvent respondsToSelector:@selector(_setTimestamp:)] ||
+        ![touchEvent respondsToSelector:@selector(_addTouch:forDelayedDelivery:)]) {
+        CFRelease(finger);
+        CFRelease(parent);
+        CHMSetError(error, 13, @"The required private UIKit touch selectors are unavailable.");
+        return NO;
+    }
+
+    NSTimeInterval eventTime = NSProcessInfo.processInfo.systemUptime;
+    [touch setWindow:window];
+    [touch setView:hitView];
+    if ([touch respondsToSelector:@selector(setGestureView:)]) [touch setGestureView:hitView];
+    [touch setTapCount:1];
+    // Cham keeps the UITouch in Stationary; the HID event carries DOWN/UP.
+    [touch setPhase:UITouchPhaseStationary];
+    [touch setTimestamp:eventTime];
+    [touch _setLocationInWindow:point resetPrevious:NO];
+    [touch _setIsFirstTouchForView:YES];
+    if ([touch respondsToSelector:@selector(setIsTap:)]) [touch setIsTap:YES];
+    [touch _setHidEvent:parent];
+
+    [touchEvent _clearTouches];
+    [touchEvent _setHIDEvent:parent];
+    [touchEvent _setTimestamp:eventTime];
+    [touchEvent _addTouch:touch forDelayedDelivery:NO];
+    backend.activeTouch = touch;
+
     CHMSetDigitizerInfo(parent, contextID, 0, 0, NULL, 0, 0);
 
-    UIApplication *application = UIApplication.sharedApplication;
     SEL enqueueSelector = NSSelectorFromString(@"_enqueueHIDEvent:");
     if ([application respondsToSelector:enqueueSelector]) {
         ((void (*)(id, SEL, CHMIOHIDEventRef))objc_msgSend)(application, enqueueSelector, parent);
@@ -166,8 +248,14 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, NSError **er
 - (instancetype)init {
     self = [super init];
     if (self && CHMLoadHIDAPI()) {
+        __weak typeof(self) weakSelf = self;
         self.dispatchHandler = ^BOOL(CGPoint point, CHMTouchPhase phase, NSError **error) {
-            return CHMDispatchHIDTouch(point, phase, error);
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) {
+                CHMSetError(error, 14, @"The touch backend is no longer available.");
+                return NO;
+            }
+            return CHMDispatchHIDTouch(point, phase, self, error);
         };
     }
     return self;
