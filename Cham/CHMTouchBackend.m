@@ -119,14 +119,14 @@ static UIWindow *CHMActiveWindow(void) {
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:UIWindowScene.class]) continue;
         for (UIWindow *window in ((UIWindowScene *)scene).windows) {
-            if (window.isKeyWindow) return window;
+            if (window.keyWindow) return window;
         }
     }
     return nil;
 }
 
 static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBackend *backend, NSError **error) {
-    if (!NSThread.isMainThread) {
+    if (![NSThread isMainThread]) {
         CHMSetError(error, 4, @"HID touch events must be dispatched on the main thread.");
         return NO;
     }
