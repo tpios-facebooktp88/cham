@@ -4,6 +4,7 @@ Standalone iOS automation tweak/dylib intended for TrollStore + TrollFools.
 
 ## Project checkpoint
 - Technical research, verified source status, audit items, and implementation sequence: [CHECKPOINT.md](CHECKPOINT.md).
+- Successful REA/Ghidra baseline, evidence boundaries, and next reverse-engineering phases: [docs/REA-RESEARCH-BASELINE-2026-11-13.md](docs/REA-RESEARCH-BASELINE-2026-11-13.md).
 
 ## Agreed scope
 - Tap Mode: POINT, DOUBLE, HOLD, HUMAN, EXTREME, ULTRA and multi-point.
