@@ -211,3 +211,45 @@ Purpose: complete one coherent audit of the existing Tap/HID backend before furt
 - Full UIKit phase/retention semantics: open.
 - Exact IOHID append ownership and runtime event receipt: open.
 - No source-code edits, build, Actions run, or device test performed in this research pass.
+
+
+### Deep-dive findings added after the consolidated plan
+
+**Scheduler state-machine review (current source, no edits):**
+- STOP during HOLD is synchronous: it cancels the pending main-queue timer and immediately attempts UP at the remembered point. This is the correct basic order, but depends on the backend still finding a valid window and successfully constructing/dispatching the release.
+- On a normal UP failure in `advance`, the scheduler reports the error and calls `stop`, which makes one additional immediate UP attempt. If that also fails, `touchIsDown` remains true and a future START first retries STOP, then blocks if still unconfirmed. This is a bounded retry policy driven by user actions, not an autonomous retry loop.
+- The backend's return value only means its synchronous preparation and void dispatch calls were reached. Neither `IOHIDEventSystemClientDispatchEvent` nor UIApplication `_enqueueHIDEvent:` returns a delivery result; therefore `touchIsDown = NO` after a returned YES is only "dispatch path invoked", not proof the target app processed UP.
+- Important teardown limitation: scheduler `dealloc` calls `stop`, but if UP fails and the scheduler is then destroyed, its `touchIsDown` flag is lost. The backend currently retains the active `UITouch` only while the backend itself survives. No durable recovery mechanism exists. Avoid deallocating the scheduler while a touch is unconfirmed.
+- Important target-consistency gap: DOWN uses the current key window and a hit-tested view. UP calls the same path again, selecting the then-current key window and hit-testing again, then reassigns the existing `UITouch` to that window/view. If key-window ownership changes between DOWN and UP, the release may be associated with a different window/view than the original DOWN. Recommended design: capture the owning window, hit-tested view, scene/context and coordinate at DOWN; use that same contact context for UP, and fail closed if it has become invalid. Do not silently substitute another key window.
+- STOP UI status currently writes "Stopped" immediately after the scheduler call. The scheduler error handler dispatches its label update asynchronously, so a failed UP can briefly be displayed as Stopped before the error appears. This is a UI truthfulness issue to correct when implementing diagnostics.
+- DOUBLE is two sequential DOWN/UP pairs separated by `doubleTapGap`; `repeatCount=0` means indefinite cycles. HOLD is implemented as one DOWN held for `holdDuration`, then UP; it is not a separate HID phase.
+- The interval helper has a 10 ms minimum even though the UI's interval field can parse values below that. EXTREME caps to 30 ms and ULTRA to 10 ms; these modes change timing only and do not create a distinct touch mechanism.
+- Multi-point means serial points with one fixed finger index (1), not simultaneous contacts. The unused `tapsAtCurrentPoint` property is scheduler bookkeeping, not a multi-touch implementation.
+
+**Original binary coordinate/lifecycle evidence (static inspection):**
+- The original binary contains Objective-C selector references for `convertPoint:fromWindow:` and `convertPoint:toWindow:`, as well as methods named `addTargetAtScreenPoint:`, `moveTargetAtIndex:toScreenPoint:save:`, and `fakeTouchId:AtScreenPoint:inWindow:withTouchPhase:...`. This is evidence that the original code has explicit window/screen coordinate conversion machinery somewhere in its target/overlay path.
+- This string/selector evidence does **not** yet establish the exact conversion direction, the exact point passed into the HID event versus UITouch, or whether conversion occurs before the fakeTouch method. The source's current direct use of the same `CGPoint` for HID coordinates and `_setLocationInWindow:` is therefore not proven equivalent to the original. Keep coordinate conversion as a P0 open item until the relevant original method call sites are fully traced.
+- Original binary contains UIApplication lifecycle notification strings for will-resign-active, did-enter-background, and did-become-active. This indicates lifecycle handling exists in the reference binary, but does not by itself prove which callback stops the scheduler or releases an active touch.
+- Current backend UP path still selects a fresh key window and hit-tests again. It does not preserve the original DOWN window/view/context. This is a concrete source-level lifecycle/ownership gap, independent of whether the private HID API accepts the event.
+
+**Platform documentation cross-check:**
+- Apple's `UICoordinateSpace` documentation explicitly says window and screen coordinate spaces track interface orientation; persistent fixed-screen points should be converted to `UIScreen.fixedCoordinateSpace`. This confirms that coordinate-space contracts must be explicit, not inferred from matching CGPoint types: https://developer.apple.com/documentation/uikit/uicoordinatespace
+- Apple's `UIScene.willDeactivateNotification` is posted before a scene stops responding to user events, including temporary interruptions and transition to background; Apple recommends pausing ongoing work and disabling timers there: https://developer.apple.com/documentation/uikit/uiscene/willdeactivatenotification
+- `UIScene.didEnterBackgroundNotification` is later and intended for background cleanup; it is too late to be the sole point at which an active touch is released: https://developer.apple.com/documentation/uikit/uiscene/didenterbackgroundnotification
+- `UIScene.didDisconnectNotification` means the scene is being removed and is a final cleanup point, not a reliable opportunity to initiate a fresh touch sequence: https://developer.apple.com/documentation/uikit/uiscene/diddisconnectnotification
+
+**Revised implementation recommendations (not yet implemented):**
+1. Add a scene-scoped observer for `UIScene.willDeactivateNotification` (and a defensive app-level resign-active observer if required for non-scene lifecycle). Filter notifications to the scene owning the overlay. Stop the scheduler synchronously on the main thread while the scene/window is still available; record whether release was confirmed. Do not auto-resume taps on foreground.
+2. Capture the exact DOWN contact context (window, view, scene/context ID, and coordinate contract) and reuse it for UP. If it is no longer valid, report a release-unconfirmed state and block new DOWN; do not redirect UP to a different key window.
+3. Define a single coordinate contract. Likely UI point storage remains in overlay/window-local coordinates; convert explicitly to the exact coordinate space expected by HID, while UITouch receives window-local coordinates. Verify this against the original binary call sites before coding.
+4. Keep failed-UP state alive and visible. Do not let scheduler teardown erase an unconfirmed contact state. Any retry must be bounded and explicit; no infinite retry loop.
+5. Make UI status reflect "Stop requested / release unconfirmed" until a successful release dispatch path is invoked; still label that as dispatch attempted, not app receipt.
+6. Before Recorder, test iOS 16 in portrait/landscape, key-window changes, interruptions, background transition, stop-during-HOLD, repeated STOP, rapid START/STOP, and simulated backend failures.
+
+### Research status after deep dive
+- Scheduler normal/STOP/HOLD/double/interval semantics: source review complete.
+- UP failure and bounded retry behavior: source review complete; teardown and window reassignment gaps identified.
+- Original binary coordinate conversion: selector evidence found; exact call-site direction remains open.
+- Original binary lifecycle handling: notification evidence found; exact behavior remains open.
+- iOS lifecycle timing and coordinate-space guidance: checked against current Apple documentation.
+- No source-code edits, build, Actions run, or device test performed in this pass.
