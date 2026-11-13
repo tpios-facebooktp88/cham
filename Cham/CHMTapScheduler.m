@@ -69,7 +69,7 @@
 }
 
 - (NSTimeInterval)tapHoldDuration {
-    return self.mode == CHMTapModeHold ? MAX(0.05, self.holdDuration) : 0.06;
+    return MAX(0.0001, self.holdDuration);
 }
 
 - (NSTimeInterval)nextInterval {
