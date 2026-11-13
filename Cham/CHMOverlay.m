@@ -48,7 +48,7 @@
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
         BOOL hadPendingTouch = self.scheduler.hasUnconfirmedTouch;
-        BOOL wasRunning = self.scheduler.isRunning;
+        BOOL wasRunning = self.scheduler.running;
         [self.scheduler stop];
         if (self.scheduler.hasUnconfirmedTouch) {
             self.statusLabel.text = @"STOPPED · RELEASE UNCONFIRMED";
@@ -296,7 +296,7 @@
     self.scheduler.holdDuration = MAX(0.0001, self.touchTimeSlider.value / 1000.0);
     self.scheduler.repeatCount = 0;
     [self.scheduler start];
-    self.statusLabel.text = self.scheduler.isRunning
+    self.statusLabel.text = self.scheduler.running
         ? @"RUNNING · STOP to finish (delivery not yet verified)"
         : @"START FAILED · Check HID support; see error above";
 }
