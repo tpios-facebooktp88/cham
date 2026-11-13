@@ -39,7 +39,7 @@
     NSNotificationName lifecycleName = window.windowScene
         ? UISceneWillDeactivateNotification
         : UIApplicationWillResignActiveNotification;
-    id lifecycleObject = window.windowScene ?: UIApplication.sharedApplication;
+    id lifecycleObject = window.windowScene ? (id)window.windowScene : (id)UIApplication.sharedApplication;
     self.lifecycleObserver = [[NSNotificationCenter defaultCenter]
         addObserverForName:lifecycleName
                     object:lifecycleObject
