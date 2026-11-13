@@ -1,0 +1,56 @@
+name: Build Cham AutoClicker
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Theos package (iOS)
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Theos and iOS SDK
+        env:
+          THEOS: ${{ runner.temp }}/theos
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
+
+      - name: Build package
+        env:
+          THEOS: ${{ runner.temp }}/theos
+        run: |
+          set -euo pipefail
+          make clean package FINALPACKAGE=1
+
+          OUTPUT_DIR="${RUNNER_TEMP}/cham-output"
+          mkdir -p "$OUTPUT_DIR"
+
+          find packages -maxdepth 1 -type f -name '*.deb' -exec cp {} "$OUTPUT_DIR/" \;
+
+          DYLIB_PATH="$(find .theos -type f -name 'Cham.dylib' -print -quit)"
+          if [ -z "$DYLIB_PATH" ]; then
+            echo "Cham.dylib was not produced by Theos." >&2
+            exit 1
+          fi
+          cp "$DYLIB_PATH" "$OUTPUT_DIR/Cham.dylib"
+
+          echo "Build outputs:"
+          ls -lh "$OUTPUT_DIR"
+
+      - name: Upload build outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cham-AutoClicker-${{ github.run_number }}
+          path: ${{ runner.temp }}/cham-output/
+          if-no-files-found: error
+          retention-days: 7
