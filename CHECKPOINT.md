@@ -305,3 +305,13 @@ The previous `.isRunning` correction was not the only Objective-C dot-syntax iss
 - `CHMTouchBackend.m`: `NSThread.isMainThread` changed to the explicit class-method call `[NSThread isMainThread]`.
 
 These are source-level compile-risk corrections found by scanning every current Objective-C/Objective-C++ source file for dot expressions beginning with `is`. The code was not compiled. The user still performs the build; if it fails again, the earliest compiler diagnostic is needed to distinguish any remaining SDK/toolchain issue from source errors.
+
+## Build failure #10 — exact compiler diagnostic and fix — 2026-11-13
+
+- Inspected GitHub Actions run #10 for commit `554630c71bee9f3cfee6a87e4fc42c462c2a8f58` directly; job `Build Cham.dylib` failed during compilation of `Cham/CHMOverlay.m`.
+- Exact first compiler error: `Cham/CHMOverlay.m:47:46: error: unused parameter 'note' [-Werror,-Wunused-parameter]`.
+- Cause: the notification observer block accepted `NSNotification *note` but never read it. The project enables `-Wextra`, and Theos/Clang treats this warning as an error in the build environment.
+- Minimal fix: added `(void)note;` at the start of the observer block. No behavior change; notification timing and observer logic are unchanged.
+- The failure was retrieved from the existing user-triggered Actions run; no new build or workflow run was started by the assistant.
+- Source fix commit: `08365142c2500ee73f5dd97a27d93e058ab0cb89`.
+- Build has not been rerun. The user remains responsible for the next build; do not mark compilation successful until a subsequent run succeeds.
