@@ -40,20 +40,25 @@ typedef struct __IOHIDEventSystemClient *CHMIOHIDEventSystemClientRef;
 @property (nonatomic) CGPoint activePoint;
 @end
 
+// REA's recovered call site passes coordinates/pressure first, then allocator/time
+// and digitizer metadata. Keep this ABI order for the private constructor.
 typedef CHMIOHIDEventRef (*CHMCreateDigitizerEventFn)(
-    CFAllocatorRef, uint64_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t,
-    double, double, double, double, double, uint8_t, uint8_t, uint32_t);
-typedef CHMIOHIDEventRef (*CHMCreateFingerEventFn)(
+    double, double, double, double, double,
     CFAllocatorRef, uint64_t, uint32_t, uint32_t, uint32_t,
-    double, double, double, double, double, uint8_t, uint8_t, uint32_t);
+    uint32_t, uint32_t, uint8_t, uint8_t);
+typedef CHMIOHIDEventRef (*CHMCreateFingerEventFn)(
+    double, double, double, double, double,
+    CFAllocatorRef, uint64_t, uint32_t, uint32_t, uint32_t,
+    uint8_t, uint8_t, uint32_t);
 typedef CHMIOHIDEventSystemClientRef (*CHMCreateClientFn)(CFAllocatorRef);
 typedef void (*CHMSetSenderIDFn)(CHMIOHIDEventRef, uint64_t);
 typedef void (*CHMSetIntegerValueFn)(CHMIOHIDEventRef, uint32_t, int);
 typedef void (*CHMSetFloatValueFn)(CHMIOHIDEventRef, uint32_t, double);
 typedef void (*CHMAppendEventFn)(CHMIOHIDEventRef, CHMIOHIDEventRef, uint32_t);
 typedef void (*CHMDispatchEventFn)(CHMIOHIDEventSystemClientRef, CHMIOHIDEventRef);
+// Recovered call order: (0, 0, event, windowContextID, 0, 0, 0).
 typedef void (*CHMSetDigitizerInfoFn)(
-    CHMIOHIDEventRef, uint32_t, uint8_t, uint8_t, CFStringRef, CFTimeInterval, float);
+    uint32_t, uint32_t, CHMIOHIDEventRef, uint32_t, uint32_t, uint32_t, uint32_t);
 
 static void *CHMIOKitHandle;
 static void *CHMBackBoardHandle;
@@ -174,19 +179,26 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
     const double force = 0.5;
     const double radius = 0.04;
     const uint32_t fingerIndex = 1; // The scheduler currently drives one active finger.
+    const uint8_t inRange = isDown ? 1 : 0;
+    const uint8_t inTouch = isDown ? 1 : 0;
+    // Scheduler points are window-local; the original Cham path uses screen
+    // coordinates for HID and window-local coordinates for UITouch.
+    CGPoint hidPoint = [window convertPoint:point toWindow:nil];
 
     uint64_t timestamp = mach_absolute_time();
     CHMIOHIDEventRef parent = CHMCreateDigitizerEvent(
+        hidPoint.x, hidPoint.y, 0.0, force, 0.0,
         kCFAllocatorDefault, timestamp, 3, 0, 0, eventMask, 0,
-        point.x, point.y, 0.0, force, 0.0, 1, 1, 0);
+        inRange, inTouch);
     if (!parent) {
         CHMSetError(error, 8, @"IOHIDEventCreateDigitizerEvent returned null.");
         return NO;
     }
 
     CHMIOHIDEventRef finger = CHMCreateFingerEvent(
+        hidPoint.x, hidPoint.y, 0.0, force, 0.0,
         kCFAllocatorDefault, timestamp, fingerIndex, fingerIndex, eventMask,
-        point.x, point.y, 0.0, force, 0.0, 1, 1, 0);
+        inRange, inTouch, 0);
     if (!finger) {
         CFRelease(parent);
         CHMSetError(error, 9, @"IOHIDEventCreateDigitizerFingerEvent returned null.");
@@ -262,7 +274,6 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
     [touch setView:hitView];
     if ([touch respondsToSelector:@selector(setGestureView:)]) [touch setGestureView:hitView];
     [touch setTapCount:1];
-    // Cham keeps the UITouch in Stationary; the HID event carries DOWN/UP.
     [touch setPhase:isDown ? UITouchPhaseBegan : UITouchPhaseEnded];
     [touch setTimestamp:eventTime];
     [touch _setLocationInWindow:point resetPrevious:isDown];
@@ -276,7 +287,7 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
     [touchEvent _addTouch:touch forDelayedDelivery:NO];
 
     if (CHMSetDigitizerInfo && contextID != 0) {
-        CHMSetDigitizerInfo(parent, contextID, 0, 0, NULL, 0, 0);
+        CHMSetDigitizerInfo(0, 0, parent, contextID, 0, 0, 0);
     }
 
     SEL enqueueSelector = NSSelectorFromString(@"_enqueueHIDEvent:");
