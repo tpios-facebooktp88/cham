@@ -18,6 +18,7 @@
 @property (nonatomic, strong) CHMTapScheduler *scheduler;
 @property (nonatomic) BOOL panelVisible;
 @property (nonatomic) CGFloat panelScale;
+@property (nonatomic, strong) id lifecycleObserver;
 @end
 
 @implementation CHMOverlay
@@ -34,11 +35,33 @@
     if (!window || self.handle) return;
 
     self.hostWindow = window;
+    __weak typeof(self) weakSelf = self;
+    NSNotificationName lifecycleName = window.windowScene
+        ? UISceneWillDeactivateNotification
+        : UIApplicationWillResignActiveNotification;
+    id lifecycleObject = window.windowScene ?: UIApplication.sharedApplication;
+    self.lifecycleObserver = [[NSNotificationCenter defaultCenter]
+        addObserverForName:lifecycleName
+                    object:lifecycleObject
+                     queue:NSOperationQueue.mainQueue
+                usingBlock:^(NSNotification *note) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        BOOL hadPendingTouch = self.scheduler.hasUnconfirmedTouch;
+        BOOL wasRunning = self.scheduler.isRunning;
+        [self.scheduler stop];
+        if (self.scheduler.hasUnconfirmedTouch) {
+            self.statusLabel.text = @"STOPPED · RELEASE UNCONFIRMED";
+        } else if (hadPendingTouch) {
+            self.statusLabel.text = @"Stopped · UP dispatch path invoked (delivery unverified)";
+        } else if (wasRunning) {
+            self.statusLabel.text = @"Scene inactive · scheduler stopped";
+        }
+    }];
     self.points = [NSMutableArray array];
     self.pointMarkers = [NSMutableArray array];
     self.panelScale = 1.0;
     self.scheduler = [[CHMTapScheduler alloc] init];
-    __weak typeof(self) weakSelf = self;
     self.scheduler.errorHandler = ^(NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
             weakSelf.statusLabel.text = [NSString stringWithFormat:@"ERROR: %@", error.localizedDescription];
@@ -279,8 +302,21 @@
 }
 
 - (void)stopTapping {
+    BOOL hadPendingTouch = self.scheduler.hasUnconfirmedTouch;
     [self.scheduler stop];
-    self.statusLabel.text = @"Stopped";
+    if (self.scheduler.hasUnconfirmedTouch) {
+        self.statusLabel.text = @"STOPPED · RELEASE UNCONFIRMED";
+    } else if (hadPendingTouch) {
+        self.statusLabel.text = @"Stopped · UP dispatch path invoked (delivery unverified)";
+    } else {
+        self.statusLabel.text = @"Stopped";
+    }
+}
+
+- (void)dealloc {
+    if (self.lifecycleObserver) {
+        [[NSNotificationCenter defaultCenter] removeObserver:self.lifecycleObserver];
+    }
 }
 
 - (void)movePanel:(UIPanGestureRecognizer *)gesture {
