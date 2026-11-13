@@ -67,12 +67,16 @@ POINT coordinates are clamped to the current window bounds when restored or adde
 ### Touch lifecycle invariants
 
 - A new DOWN is not sent while a previous touch remains active.
-- UP is sent to the same retained touch/window/view context used by DOWN.
-- If UP cannot be confirmed, the scheduler remains blocked from starting another DOWN.
+- UP uses the same retained `UITouch`, `UIWindow`, original target `UIView`, and context captured at DOWN. The original view may detach from the window during an app transition; this alone must not prevent the matching UP.
+- UP must never be re-hit-tested against a replacement view. If the retained touch/window/view is missing or UP cannot be confirmed, the scheduler remains blocked from starting another DOWN.
 - STOP and app-inactive handling attempt to release an active touch.
 - The backend reports unavailable/error states rather than pretending a touch succeeded.
 
 The HID/UIKit implementation uses private iOS APIs and dynamically resolved IOKit/BackBoard symbols. Compatibility depends on the target iOS version and runtime environment; a successful compile alone does not prove that touch injection works on-device.
+
+### App-transition handling
+
+Some apps replace or detach the view that received DOWN while transitioning between screens. Cham must still deliver UP through the original retained touch/window/view context; rejecting UP only because `originalView.window` is now `nil` can leave the contact active and stop the tap loop. The fix keeps the original target objects and removes only that invalid attachment check—it does not re-hit-test, synthesize a new target, or weaken the active-touch safety gate.
 
 ## Build
 
@@ -91,9 +95,9 @@ Or manually dispatch **Build Cham dylib** from the repository's GitHub Actions p
 
 ## Validation status
 
-- The user has confirmed a successful build after the scheduler compile fix.
-- The user previously confirmed that the POINT backend generated a real click on-device.
-- The latest UI refinements (removing the top purple accent and adding direct press-duration entry) are source changes and still need a fresh build and on-device visual/interaction check.
+- The user confirmed the tool runs smoothly in Lazada.
+- After the detached-view UP fix, the user confirmed the tool also runs smoothly in Shopee, including continued taps rather than stopping after the first tap.
+- The user confirmed a successful build after the scheduler compile fix; subsequent device testing validates actual touch behavior, not merely compilation.
 - The original uploaded `Cham.dylib` is preserved unchanged and is not a build input.
 
 ## Project rules
