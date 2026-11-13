@@ -114,7 +114,7 @@ static UIWindow *CHMActiveWindow(void) {
             if (window.isKeyWindow) return window;
         }
     }
-    return UIApplication.sharedApplication.keyWindow;
+    return nil;
 }
 
 static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBackend *backend, NSError **error) {
