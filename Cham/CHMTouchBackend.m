@@ -1,4 +1,5 @@
 #import "CHMTouchBackend.h"
+#import <math.h>
 
 NSString * const CHMTouchBackendErrorDomain = @"com.cham.autoclicker.touch";
 
@@ -27,7 +28,16 @@ NSString * const CHMTouchBackendErrorDomain = @"com.cham.autoclicker.touch";
         }
         return NO;
     }
-    return handler(point, phase, error);
+
+    NSError *localError = nil;
+    NSError **targetError = error ?: &localError;
+    BOOL sent = handler(point, phase, targetError);
+    if (!sent && !*targetError) {
+        *targetError = [NSError errorWithDomain:CHMTouchBackendErrorDomain
+                                           code:3
+                                       userInfo:@{NSLocalizedDescriptionKey:@"The registered touch provider rejected the event."}];
+    }
+    return sent;
 }
 
 @end
