@@ -368,3 +368,33 @@ Compared the current `main` source against the final REA/Ghidra baseline. This i
 - Vision OCR engine: not implemented.
 - iOS 16 device validation: outstanding.
 - Original `Cham.dylib`: preserved unchanged.
+
+
+## Touch terminal-phase correction — 2026-11-13
+
+A focused source correction was made from the saved REA run #5 pseudocode. No new REA/Actions run or build was performed.
+
+### Evidence from the existing artifact
+
+- `0x9a8c` passes the supplied phase value into UITouch's private `setPhase:` selector.
+- The same routine removes the stored UITouch from its dictionary for phase values 3 and 4; other phases retain/update the touch.
+- `0xba18` begins a normal tap with phase 0. Its completion callback `0xbc90` sends phase 3.
+- `0xa9d8` maps phase values 0, 3 and 4 to HID event mask `0x27`; phase values 1 and 2 map to `0x24`.
+
+### Source changes on main
+
+- `CHMTouchPhaseUp` is now explicitly value 3, matching UITouch Ended.
+- The backend sets `UITouchPhaseBegan` for DOWN and `UITouchPhaseEnded` for UP instead of setting Stationary for both.
+- The DOWN/ENDED HID event uses mask `0x27`, consistent with the reference helper.
+- `_setLocationInWindow:resetPrevious:` now resets previous location on DOWN and preserves it on UP.
+
+Commits:
+- Header enum: `c2fa36dc473545bb9e5e3e5637f706b1b0eff351`
+- Backend release phase: `70d2f943c0418e8bc6eafce79ff5760c036ac8b0`
+
+### Validation boundary
+
+- Source changes are committed and verified in GitHub.
+- No build or device test was run. User must compile and test a tap on a clear target-app control.
+- A successful dispatch call still does not prove that iOS delivered the touch to the target app.
+- The backend currently supports only DOWN and terminal UP; the reference's optional intermediate HUMAN move phase (1) is not yet implemented.
