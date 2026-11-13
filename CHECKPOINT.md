@@ -106,8 +106,8 @@ Verified from Objective-C metadata and arm64 call-site disassembly:
 - The DOWN/UP event-mask call site is consistent with `0x27` for phase 0 and `0x24` for phase 1.
 
 Correction made from this comparison:
-- The first reimplementation incorrectly treated `BKSHIDEventSetDigitizerInfo` as mandatory. The original path treats it as optional. `CHMTouchBackend.m` now excludes it from the required-symbol gate and calls it only when resolved.
-- Source change commit: `7f49737224f309134d45ea7bf3177060733ef2b4`.
+- The first reimplementation incorrectly treated BackBoardServices and `BKSHIDEventSetDigitizerInfo` as mandatory. The original loader continues when BackBoardServices cannot be opened; the metadata call is conditional on the function and a valid context ID. `CHMTouchBackend.m` now keeps both optional.
+- Source change commits: `7f49737224f309134d45ea7bf3177060733ef2b4` (optional symbol) and `02c2c98f82dc036a6deee9d45b382224908548ba` (optional framework).
 
 Still requiring audit:
 - Full UITouch/UIEvent phase and reuse lifecycle, including cleanup after UP and stop.
