@@ -171,6 +171,17 @@ jobs:
           run_rea research-output/trace-tap-modes.json \
             rea trace "$THIN_BINARY" "smartTapAtScreenPoint:" --provider ghidra --json
 
+          # Resolve the Objective-C method procedures exposed by the xref/trace
+          # results. These addresses are procedure entries, not selector-string
+          # addresses. Preserve both function dossiers and decompiled pseudocode.
+          for address in 0x9a5c 0x9a74 0x9a8c 0xba18 0xbdc4 0xcecc; do
+            safe_address="${address#0x}"
+            run_rea "research-output/function-${safe_address}.json" \\
+              rea function "$THIN_BINARY" "$address" --provider ghidra --json
+            run_rea "research-output/decompile-${safe_address}.json" \\
+              rea decompile "$THIN_BINARY" "$address" --provider ghidra --json
+          done
+
       - name: Upload REA research reports
         if: always()
         uses: actions/upload-artifact@v4
