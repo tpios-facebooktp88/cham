@@ -118,9 +118,9 @@ jobs:
             llvm-lipo-18 -info "$THIN_BINARY"
           } > research-output/environment.txt
 
-          # CLI commands are one-shot processes. Keep one REA MCP server alive
-          # so Ghidra imports/analyzes this binary once and batch_decompile reads
-          # all six known procedure entries in the same Program session.
+          # Keep one REA MCP server alive for the entire final research pass.
+          # Feature discovery and the single consolidated batch decompile share
+          # the same imported Ghidra Program; no per-feature Actions are needed.
           npm install --prefix "$RUNNER_TEMP/rea-mcp-client" \
             --no-audit --no-fund @modelcontextprotocol/client@2.3.1
           cp scripts/rea-research-batch.mjs "$RUNNER_TEMP/rea-mcp-client/rea-research-batch.mjs"
