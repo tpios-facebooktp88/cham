@@ -280,8 +280,8 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
         return NO;
     }
 
-    NSError *localError = nil;
-    NSError **targetError = error ?: &localError;
+    NSError * __autoreleasing localError = nil;
+    NSError * __autoreleasing *targetError = error ? error : &localError;
     BOOL sent = handler(point, phase, targetError);
     if (!sent && !*targetError) {
         CHMSetError(targetError, 10, @"The HID touch provider rejected the event.");
