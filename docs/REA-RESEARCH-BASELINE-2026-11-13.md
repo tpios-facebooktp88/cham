@@ -260,3 +260,22 @@ Decompile the helper/callback procedures in one REA MCP batch, using addresses g
   - `0x5f30` — smart-tap eligibility helper.
 - These are candidate addresses inferred from direct call targets in the successful run #4 pseudocode. REA must resolve each address as a procedure; unresolved/non-entry addresses will be recorded as such rather than assumed to be functions.
 - This batch has been prepared but not yet run. It continues to use one persistent REA MCP session and does not alter the original binary or build the tweak.
+
+
+## Final consolidated research run — only one more Actions execution
+
+The user requested that the remaining research be consolidated and that Actions be run only one more time. The workflow and runner are now prepared for that single final pass.
+
+- Runner commit: `944f4128b06fc8c4d5a7f49508cc2a7d466ca0f1`
+- Workflow comment update: `fe80c58df9e13d719c403a45f9299d66477ad750`
+- Branch: `main`
+- This is **one manual GitHub Actions workflow run**, not one run per feature.
+- The runner opens the arm64 image once in one persistent REA MCP/Ghidra session.
+- It performs one discovery pass for: `record`, `replay`, `OCR`, `Vision`, `HUMAN`, `EXTREME`, `ULTRA`, `HOLD`, `multiTouch`, `fakeTouch`, `normalTap`, `doubleTap`, and `smartTap`.
+- For every feature query, it saves the trace and collects matched procedure entries plus procedures containing references to matched strings.
+- It combines those dynamically discovered procedures with the known Touch/HID helpers, Tap entry points and callbacks, then submits **one** `batch_decompile` request (maximum 160 procedure addresses).
+- Expected artifact includes every individual feature trace, one consolidated decompile result, the tool catalog, binary overview, environment and a summary of discovered/decompiled targets.
+- The batch is prepared but **has not been run yet**. The user must manually click Run workflow once.
+- After this run, do not request another Actions execution for routine follow-up. Analyze the saved artifact and record any gaps as limitations. Only ask for another run if the final artifact is corrupt or the workflow itself fails, and explain why first.
+
+Scope of this final static pass: Touch/HID, known Tap modes and callbacks, Recorder/Replay string-reference discovery, and OCR/Vision string-reference discovery. A successful static pass does not establish device runtime behavior; runtime validation remains a separate evidence class and is not part of this Actions run.
