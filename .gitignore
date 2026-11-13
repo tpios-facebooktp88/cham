@@ -1,0 +1,7 @@
+.theos/
+.deb
+.ipa
+*.dSYM
+*.zip
+build/
+DerivedData/

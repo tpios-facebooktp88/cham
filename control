@@ -1,0 +1,8 @@
+Package: com.cham.autoclicker
+Name: Cham AutoClicker
+Version: 0.1.0
+Architecture: iphoneos-arm
+Description: Standalone automation overlay for TrollStore and TrollFools.
+Maintainer: Cham
+Author: Cham
+Section: Tweaks
