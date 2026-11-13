@@ -241,7 +241,6 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
     [touchEvent _setHIDEvent:parent];
     [touchEvent _setTimestamp:eventTime];
     [touchEvent _addTouch:touch forDelayedDelivery:NO];
-    backend.activeTouch = touch;
 
     if (CHMSetDigitizerInfo && contextID != 0) {
         CHMSetDigitizerInfo(parent, contextID, 0, 0, NULL, 0, 0);
@@ -252,6 +251,10 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
         ((void (*)(id, SEL, CHMIOHIDEventRef))objc_msgSend)(application, enqueueSelector, parent);
     }
     CHMDispatchEvent(CHMEventClient, parent);
+
+    // A UITouch belongs to one DOWN/UP sequence. Retain it while DOWN is
+    // active, then release the backend's reference after the UP event is sent.
+    backend.activeTouch = phase == CHMTouchPhaseDown ? touch : nil;
 
     CFRelease(finger);
     CFRelease(parent);
