@@ -103,7 +103,7 @@ Verified from Objective-C metadata and arm64 call-site disassembly:
 - IOKit is attempted from both public-framework and private-framework paths; BackBoardServices is loaded from its private-framework path.
 - Call sites confirm sender ID `0xDEFACEDBEEFFECE5`; integer field IDs `0xB002F`, `0xB0039`, `0xB003A`, `0xB003B`; and finger float field IDs `0xB0030`, `0xB0031`.
 - The original constructs a parent digitizer event and a finger event, appends the finger event, conditionally applies BackBoard digitizer metadata when the API and nonzero window context are available, then uses the UIApplication enqueue path when supported and the HID event-system dispatch path.
-- The DOWN/UP event-mask call site is consistent with `0x27` for phase 0 and `0x24` for phase 1.
+- The original helper's branch selects event mask `0x27` for phase value 0, `0x24` for phase values 1–2, and `0x27` for values 3–4. Do not equate phase value 1 with UP until the original scheduler call sites and UIKit phase contract are fully traced.
 
 Correction made from this comparison:
 - The first reimplementation incorrectly treated BackBoardServices and `BKSHIDEventSetDigitizerInfo` as mandatory. The original loader continues when BackBoardServices cannot be opened; the metadata call is conditional on the function and a valid context ID. `CHMTouchBackend.m` now keeps both optional.
@@ -112,7 +112,7 @@ Correction made from this comparison:
 Still requiring audit:
 - Full UITouch/UIEvent phase and reuse lifecycle, including cleanup after UP and stop.
 - Exact event ownership/release behavior for every failure branch.
-- The original multi-touch identifier behavior versus the current scheduler's deliberate single-finger index.
+- The original multi-touch identifier behavior versus the current scheduler's deliberate single-finger index. The original Objective-C method encoding confirms an explicit touch-ID parameter; current reimplementation pins the ID to 1.
 - Whether all UIKit bridge selectors are required on every supported iOS 16 target.
 - Device-level receipt of events. Binary similarity and a void dispatch call are not proof of successful app-level delivery.
 
