@@ -1,0 +1,127 @@
+name: REA research - original Cham binary
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-research-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    name: Analyze original Cham.dylib with REA + Ghidra
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Verify original binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f Cham.dylib || { echo "Cham.dylib missing at repository root" >&2; exit 1; }
+          ACTUAL="$(sha256sum Cham.dylib | awk '{print $1}')"
+          EXPECTED="bfeeced4b8d57d8f384fbe539fa2c575b98405172d4f32655ce79bd4ef1c4fdd"
+          echo "SHA-256: $ACTUAL"
+          test "$ACTUAL" = "$EXPECTED" || {
+            echo "Original binary hash mismatch; refusing analysis." >&2
+            exit 1
+          }
+          file Cham.dylib
+          stat --printf='Size: %s bytes\n' Cham.dylib
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
+          cache: npm
+
+      - name: Install Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Download and verify Ghidra 12.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="$(curl -fsSL https://api.github.com/repos/NationalSecurityAgency/ghidra/releases/tags/Ghidra_12.2_build | jq -r '.assets[] | select(.name | test("^ghidra_12\\.2_PUBLIC_.*\\.zip$")) | .browser_download_url' | head -n 1)"
+          test -n "$URL" || { echo "Could not locate official Ghidra 12.2 release asset" >&2; exit 1; }
+          curl -fL --retry 3 "$URL" -o "$RUNNER_TEMP/ghidra.zip"
+          echo "2c2cd776db3c1f6a097ba418922378ac3649cadd5e844a6f5f088ae628a7be67  $RUNNER_TEMP/ghidra.zip" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/ghidra"
+          unzip -q "$RUNNER_TEMP/ghidra.zip" -d "$RUNNER_TEMP/ghidra"
+          GHIDRA_DIR="$(find "$RUNNER_TEMP/ghidra" -mindepth 1 -maxdepth 1 -type d -name 'ghidra_*' -print -quit)"
+          test -n "$GHIDRA_DIR"
+          echo "GHIDRA_INSTALL_DIR=$GHIDRA_DIR" >> "$GITHUB_ENV"
+          echo "GHIDRA_INSTALL_DIR=$GHIDRA_DIR"
+
+      - name: Install REA CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global rea-agents@latest
+          rea --version
+          node --version
+          java -version
+
+      - name: Check Ghidra provider readiness
+        shell: bash
+        env:
+          REA_GHIDRA_STARTUP_TIMEOUT_MS: 1200000
+        run: |
+          set -euo pipefail
+          rea doctor --provider ghidra --json | tee doctor.json
+
+      - name: Run REA analysis
+        shell: bash
+        env:
+          REA_GHIDRA_STARTUP_TIMEOUT_MS: 1200000
+        run: |
+          set -euo pipefail
+          mkdir -p research-output
+          {
+            echo "Repository: $GITHUB_REPOSITORY"
+            echo "Commit: $GITHUB_SHA"
+            echo "Binary: Cham.dylib"
+            sha256sum Cham.dylib
+            stat --printf='Size: %s bytes\n' Cham.dylib
+            rea --version
+            node --version
+            java -version 2>&1
+          } > research-output/environment.txt
+
+          rea analyze "$GITHUB_WORKSPACE/Cham.dylib" --provider ghidra --json \
+            > research-output/overview.json
+
+          rea search "$GITHUB_WORKSPACE/Cham.dylib" "fakeTouchId:AtScreenPoint:inWindow:withTouchPhase:" --provider ghidra --json \
+            > research-output/search-fake-touch.json
+          rea search "$GITHUB_WORKSPACE/Cham.dylib" "smartTapAtScreenPoint:" --provider ghidra --json \
+            > research-output/search-smart-tap.json
+          rea search "$GITHUB_WORKSPACE/Cham.dylib" "_normalTapAt:inWindow:duration:" --provider ghidra --json \
+            > research-output/search-normal-tap.json
+          rea search "$GITHUB_WORKSPACE/Cham.dylib" "_doubleTapAt:inWindow:" --provider ghidra --json \
+            > research-output/search-double-tap.json
+          rea search "$GITHUB_WORKSPACE/Cham.dylib" "_extremeBurstInWindow:" --provider ghidra --json \
+            > research-output/search-extreme.json
+          rea search "$GITHUB_WORKSPACE/Cham.dylib" "_ultraTapInWindow:" --provider ghidra --json \
+            > research-output/search-ultra.json
+
+      - name: Upload REA research reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cham-REA-Research-${{ github.run_number }}
+          path: |
+            doctor.json
+            research-output/
+          if-no-files-found: warn
+          retention-days: 14
