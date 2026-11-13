@@ -42,14 +42,14 @@ typedef struct __IOHIDEventSystemClient *CHMIOHIDEventSystemClientRef;
 
 // REA's recovered call site passes coordinates/pressure first, then allocator/time
 // and digitizer metadata. Keep this ABI order for the private constructor.
+// Match the exported IOKit ABI: allocator/time and digitizer metadata
+// precede the coordinate/pressure values.
 typedef CHMIOHIDEventRef (*CHMCreateDigitizerEventFn)(
-    double, double, double, double, double,
-    CFAllocatorRef, uint64_t, uint32_t, uint32_t, uint32_t,
-    uint32_t, uint32_t, uint8_t, uint8_t);
+    CFAllocatorRef, uint64_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t,
+    double, double, double, double, double, uint8_t, uint8_t, uint32_t);
 typedef CHMIOHIDEventRef (*CHMCreateFingerEventFn)(
-    double, double, double, double, double,
     CFAllocatorRef, uint64_t, uint32_t, uint32_t, uint32_t,
-    uint8_t, uint8_t, uint32_t);
+    double, double, double, double, double, uint8_t, uint8_t, uint32_t);
 typedef CHMIOHIDEventSystemClientRef (*CHMCreateClientFn)(CFAllocatorRef);
 typedef void (*CHMSetSenderIDFn)(CHMIOHIDEventRef, uint64_t);
 typedef void (*CHMSetIntegerValueFn)(CHMIOHIDEventRef, uint32_t, int);
@@ -187,17 +187,17 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
 
     uint64_t timestamp = mach_absolute_time();
     CHMIOHIDEventRef parent = CHMCreateDigitizerEvent(
-        hidPoint.x, hidPoint.y, 0.0, force, 0.0,
         kCFAllocatorDefault, timestamp, 3, 0, 0, eventMask, 0,
-        inRange, inTouch);
+        hidPoint.x, hidPoint.y, 0.0, force, 0.0,
+        inRange, inTouch, 0);
     if (!parent) {
         CHMSetError(error, 8, @"IOHIDEventCreateDigitizerEvent returned null.");
         return NO;
     }
 
     CHMIOHIDEventRef finger = CHMCreateFingerEvent(
-        hidPoint.x, hidPoint.y, 0.0, force, 0.0,
         kCFAllocatorDefault, timestamp, fingerIndex, fingerIndex, eventMask,
+        hidPoint.x, hidPoint.y, 0.0, force, 0.0,
         inRange, inTouch, 0);
     if (!finger) {
         CFRelease(parent);
