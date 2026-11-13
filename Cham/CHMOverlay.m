@@ -72,6 +72,7 @@
     UIButton *handle = [UIButton buttonWithType:UIButtonTypeSystem];
     handle.frame = CGRectMake(MAX(12.0, window.bounds.size.width - 72.0),
                               window.safeAreaInsets.top + 90.0, 56.0, 56.0);
+    handle.tag = 0x43484D; // Exclude Cham UI from synthetic-touch target hit-testing.
     handle.backgroundColor = [UIColor colorWithRed:0.12 green:0.48 blue:0.92 alpha:0.94];
     handle.layer.cornerRadius = 28.0;
     [handle setTitle:@"CH" forState:UIControlStateNormal];
@@ -132,6 +133,7 @@
     CGFloat y = MIN(CGRectGetMaxY(self.handle.frame) + 10.0,
                     CGRectGetHeight(self.hostWindow.bounds) - height - 12.0);
     UIView *panel = [[UIView alloc] initWithFrame:CGRectMake(12.0, MAX(12.0, y), width, height)];
+    panel.tag = 0x43484D; // Exclude Cham UI from synthetic-touch target hit-testing.
     panel.backgroundColor = [UIColor colorWithWhite:0.07 alpha:0.97];
     panel.layer.cornerRadius = 14.0;
     panel.layer.borderWidth = 1.0;
