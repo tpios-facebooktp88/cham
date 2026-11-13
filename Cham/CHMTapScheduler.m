@@ -1,4 +1,5 @@
 #import "CHMTapScheduler.h"
+#import <dispatch/dispatch.h>
 
 @interface CHMTapScheduler ()
 @property (nonatomic, strong) dispatch_source_t timer;
