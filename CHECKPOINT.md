@@ -19,6 +19,7 @@ POINT-only auto-clicker for TrollStore + TrollFools. No alternate tap modes, rec
 - `CHMOverlay` has the refreshed compact panel and saves coordinates, points, interval, press duration, handle position, panel position, and scale through `NSUserDefaults`.
 - Unused OCR matcher files and legacy tap-mode code have been removed.
 - Explicit `dispatch/dispatch.h` import added to the scheduler.
+- Scheduler reads stored `CGPoint` values with `NSValue`'s `getValue:` API (avoids the unavailable `CGPointValue` property in this compilation unit).
 
 ## Recent cleanup commits
 - Scheduler dispatch import: `82ba1b84339a03e87ae6636add15e359fc1397dd`
@@ -30,8 +31,9 @@ POINT-only auto-clicker for TrollStore + TrollFools. No alternate tap modes, rec
 - Source was re-fetched from `main` after edits.
 - The known-good touch backend was not modified.
 - No build, GitHub Actions run, Codemagic build, or device test was started by the assistant.
-- The POINT-only scheduler, persistence, and UI changes still require a successful user build and device test.
-- If the build still fails, use the first actual compiler error from the build log; do not guess at further changes.
+- GitHub Actions run `43418856210` (run 17) failed at `CHMTapScheduler.m:105` because `CGPointValue` was unavailable on `NSValue` in this file.
+- Fixed that exact compiler error in commit `11a42068fdb2a08070ffffacfed260e44c986173`; source was re-fetched and verified.
+- The fix has not yet been rebuilt; a successful build and device test remain unconfirmed.
 
 ## Workflow rules
 - Work on `main` only. Never create a branch.
