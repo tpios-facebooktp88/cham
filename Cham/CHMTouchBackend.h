@@ -5,7 +5,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 typedef NS_ENUM(NSInteger, CHMTouchPhase) {
     CHMTouchPhaseDown = 0,
-    CHMTouchPhaseUp
+    CHMTouchPhaseUp = 3
 };
 
 typedef BOOL (^CHMTouchDispatchHandler)(CGPoint point, CHMTouchPhase phase, NSError * _Nullable * _Nullable error);
