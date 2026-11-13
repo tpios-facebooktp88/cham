@@ -28,7 +28,7 @@
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:UIWindowScene.class]) continue;
         for (UIWindow *candidate in ((UIWindowScene *)scene).windows) {
-            if (candidate.isKeyWindow) { window = candidate; break; }
+            if (candidate.keyWindow) { window = candidate; break; }
         }
         if (window) break;
     }
