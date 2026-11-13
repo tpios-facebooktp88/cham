@@ -32,6 +32,14 @@
 
 - (void)start {
     [self stop];
+    if (self.touchIsDown) {
+        NSError *error = [NSError errorWithDomain:@"com.cham.autoclicker.tap"
+                                             code:3
+                                         userInfo:@{NSLocalizedDescriptionKey:
+                                                        @"A previous touch has not been confirmed as released; start was blocked."}];
+        if (self.errorHandler) self.errorHandler(error);
+        return;
+    }
     if (self.points.count == 0 || !self.backend.isAvailable) {
         NSError *error = [NSError errorWithDomain:@"com.cham.autoclicker.tap"
                                              code:1
@@ -57,9 +65,15 @@
     }
     if (self.touchIsDown) {
         NSError *error = nil;
-        [self.backend dispatchPoint:self.activePoint phase:CHMTouchPhaseUp error:&error];
-        self.touchIsDown = NO;
-        if (error && self.errorHandler) self.errorHandler(error);
+        BOOL ended = [self.backend dispatchPoint:self.activePoint phase:CHMTouchPhaseUp error:&error];
+        if (ended) {
+            self.touchIsDown = NO;
+        } else if (self.errorHandler) {
+            self.errorHandler(error ?: [NSError errorWithDomain:@"com.cham.autoclicker.tap"
+                                                            code:2
+                                                        userInfo:@{NSLocalizedDescriptionKey:
+                                                                       @"Touch release was not confirmed; the scheduler remains blocked from starting another touch."}]);
+        }
     }
     self.running = NO;
 }
@@ -141,7 +155,8 @@
     NSError *error = nil;
     if (![self.backend dispatchPoint:self.activePoint phase:CHMTouchPhaseUp error:&error]) {
         if (self.errorHandler && error) self.errorHandler(error);
-        self.touchIsDown = NO;
+        // Keep touchIsDown set. stop will make one release attempt and retain
+        // the blocked state if the backend still cannot confirm the UP event.
         [self stop];
         return;
     }
