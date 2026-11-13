@@ -10,11 +10,14 @@
 @property (nonatomic, strong) UITextField *xField;
 @property (nonatomic, strong) UITextField *yField;
 @property (nonatomic, strong) UITextField *intervalField;
-@property (nonatomic, strong) UITextField *holdField;
+@property (nonatomic, strong) UISlider *touchTimeSlider;
+@property (nonatomic, strong) UILabel *touchTimeLabel;
 @property (nonatomic, strong) UISegmentedControl *modeControl;
 @property (nonatomic, strong) NSMutableArray<NSValue *> *points;
+@property (nonatomic, strong) NSMutableArray<UIView *> *pointMarkers;
 @property (nonatomic, strong) CHMTapScheduler *scheduler;
 @property (nonatomic) BOOL panelVisible;
+@property (nonatomic) CGFloat panelScale;
 @end
 
 @implementation CHMOverlay
@@ -32,11 +35,13 @@
 
     self.hostWindow = window;
     self.points = [NSMutableArray array];
+    self.pointMarkers = [NSMutableArray array];
+    self.panelScale = 1.0;
     self.scheduler = [[CHMTapScheduler alloc] init];
     __weak typeof(self) weakSelf = self;
     self.scheduler.errorHandler = ^(NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            weakSelf.statusLabel.text = error.localizedDescription;
+            weakSelf.statusLabel.text = [NSString stringWithFormat:@"ERROR: %@", error.localizedDescription];
         });
     };
 
@@ -75,7 +80,6 @@
     field.layer.cornerRadius = 6.0;
     field.layer.borderWidth = 1.0;
     field.layer.borderColor = [UIColor colorWithWhite:0.4 alpha:1.0].CGColor;
-    field.returnKeyType = UIReturnKeyDone;
     return field;
 }
 
@@ -100,7 +104,7 @@
     }
 
     CGFloat width = MIN(320.0, CGRectGetWidth(self.hostWindow.bounds) - 24.0);
-    CGFloat height = 340.0;
+    CGFloat height = 390.0;
     CGFloat y = MIN(CGRectGetMaxY(self.handle.frame) + 10.0,
                     CGRectGetHeight(self.hostWindow.bounds) - height - 12.0);
     UIView *panel = [[UIView alloc] initWithFrame:CGRectMake(12.0, MAX(12.0, y), width, height)];
@@ -111,10 +115,17 @@
     [self.hostWindow addSubview:panel];
     self.panel = panel;
 
-    UILabel *title = [self label:@"CHAM AUTOCLICKER · TAP MODE" frame:CGRectMake(12, 9, width - 52, 25)];
-    title.font = [UIFont boldSystemFontOfSize:13.0];
+    UILabel *title = [self label:@"CHAM AUTOCLICKER · TAP MODE  ↕ DRAG" frame:CGRectMake(12, 8, width - 112, 28)];
+    title.font = [UIFont boldSystemFontOfSize:11.0];
+    title.userInteractionEnabled = YES;
     [panel addSubview:title];
-    [panel addSubview:[self button:@"×" frame:CGRectMake(width - 38, 7, 28, 28)
+    UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(movePanel:)];
+    [title addGestureRecognizer:panelPan];
+    [panel addSubview:[self button:@"−" frame:CGRectMake(width - 92, 7, 26, 28)
+                              color:[UIColor colorWithWhite:0.25 alpha:1.0] action:@selector(zoomOut)]];
+    [panel addSubview:[self button:@"+" frame:CGRectMake(width - 62, 7, 26, 28)
+                              color:[UIColor colorWithWhite:0.25 alpha:1.0] action:@selector(zoomIn)]];
+    [panel addSubview:[self button:@"×" frame:CGRectMake(width - 32, 7, 26, 28)
                               color:[UIColor colorWithWhite:0.25 alpha:1.0] action:@selector(togglePanel)]];
 
     [panel addSubview:[self label:@"MODE" frame:CGRectMake(12, 42, 48, 22)]];
@@ -137,44 +148,113 @@
     [panel addSubview:[self label:@"INTERVAL (s)" frame:CGRectMake(12, 148, 82, 25)]];
     self.intervalField = [self field:@"0.5" frame:CGRectMake(94, 146, 58, 30)];
     [panel addSubview:self.intervalField];
-    [panel addSubview:[self label:@"HOLD (s)" frame:CGRectMake(166, 148, 58, 25)]];
-    self.holdField = [self field:@"0.1" frame:CGRectMake(226, 146, 58, 30)];
-    [panel addSubview:self.holdField];
 
-    [panel addSubview:[self button:@"ADD POINT" frame:CGRectMake(12, 190, (width - 32) / 2, 34)
+    [panel addSubview:[self label:@"TOUCH TIME" frame:CGRectMake(166, 148, 86, 25)]];
+    self.touchTimeSlider = [[UISlider alloc] initWithFrame:CGRectMake(12, 184, width - 86, 28)];
+    self.touchTimeSlider.minimumValue = 0.1f;
+    self.touchTimeSlider.maximumValue = 1000.0f;
+    self.touchTimeSlider.value = 60.0f;
+    [self.touchTimeSlider addTarget:self action:@selector(touchTimeChanged:) forControlEvents:UIControlEventValueChanged];
+    [panel addSubview:self.touchTimeSlider];
+    self.touchTimeLabel = [self label:@"60.0 ms" frame:CGRectMake(width - 70, 184, 62, 28)];
+    self.touchTimeLabel.textAlignment = NSTextAlignmentRight;
+    [panel addSubview:self.touchTimeLabel];
+    [panel addSubview:[self button:@"−" frame:CGRectMake(12, 216, 42, 28)
+                              color:[UIColor colorWithWhite:0.25 alpha:1.0] action:@selector(decreaseTouchTime)]];
+    [panel addSubview:[self button:@"+" frame:CGRectMake(60, 216, 42, 28)
+                              color:[UIColor colorWithWhite:0.25 alpha:1.0] action:@selector(increaseTouchTime)]];
+    [panel addSubview:[self label:@"0.1–1000 ms · press duration" frame:CGRectMake(112, 216, width - 124, 28)]];
+
+    [panel addSubview:[self button:@"ADD POINT" frame:CGRectMake(12, 252, (width - 32) / 2, 34)
                                color:[UIColor colorWithRed:0.18 green:0.38 blue:0.62 alpha:1.0]
                               action:@selector(addPoint)]];
-    [panel addSubview:[self button:@"CLEAR POINTS" frame:CGRectMake(20 + (width - 32) / 2, 190, (width - 32) / 2, 34)
+    [panel addSubview:[self button:@"CLEAR POINTS" frame:CGRectMake(20 + (width - 32) / 2, 252, (width - 32) / 2, 34)
                                color:[UIColor colorWithWhite:0.28 alpha:1.0]
                               action:@selector(clearPoints)]];
-    self.pointsLabel = [self label:@"Points: 0 · Add a point or use X/Y directly"
-                              frame:CGRectMake(12, 230, width - 24, 22)];
+    self.pointsLabel = [self label:@"Points: 0 · Drag the numbered dots to reposition"
+                              frame:CGRectMake(12, 290, width - 24, 22)];
     [panel addSubview:self.pointsLabel];
 
-    [panel addSubview:[self button:@"START" frame:CGRectMake(12, 264, (width - 32) / 2, 38)
+    [panel addSubview:[self button:@"START" frame:CGRectMake(12, 320, (width - 32) / 2, 38)
                                color:[UIColor colorWithRed:0.12 green:0.58 blue:0.30 alpha:1.0]
                               action:@selector(startTapping)]];
-    [panel addSubview:[self button:@"STOP" frame:CGRectMake(20 + (width - 32) / 2, 264, (width - 32) / 2, 38)
+    [panel addSubview:[self button:@"STOP" frame:CGRectMake(20 + (width - 32) / 2, 320, (width - 32) / 2, 38)
                                color:[UIColor colorWithRed:0.72 green:0.18 blue:0.18 alpha:1.0]
                               action:@selector(stopTapping)]];
-    self.statusLabel = [self label:@"Ready · Coordinates are screen points"
-                              frame:CGRectMake(12, 308, width - 24, 24)];
+    self.statusLabel = [self label:@"Ready · No touch sent yet"
+                              frame:CGRectMake(12, 364, width - 24, 22)];
     self.statusLabel.numberOfLines = 2;
-    self.statusLabel.font = [UIFont systemFontOfSize:11.0];
+    self.statusLabel.font = [UIFont systemFontOfSize:10.5];
     [panel addSubview:self.statusLabel];
     self.panelVisible = YES;
 }
 
 - (void)addPoint {
     CGPoint point = CGPointMake(self.xField.text.doubleValue, self.yField.text.doubleValue);
+    point.x = MIN(MAX(0.0, point.x), CGRectGetWidth(self.hostWindow.bounds));
+    point.y = MIN(MAX(0.0, point.y), CGRectGetHeight(self.hostWindow.bounds));
     [self.points addObject:[NSValue valueWithCGPoint:point]];
-    self.pointsLabel.text = [NSString stringWithFormat:@"Points: %lu · Multi-point sequence", (unsigned long)self.points.count];
+    [self createMarkerAtPoint:point index:self.points.count - 1];
+    self.pointsLabel.text = [NSString stringWithFormat:@"Points: %lu · Drag dots to move", (unsigned long)self.points.count];
     [self.panel endEditing:YES];
+}
+
+- (void)createMarkerAtPoint:(CGPoint)point index:(NSUInteger)index {
+    UIView *marker = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 30, 30)];
+    marker.center = point;
+    marker.backgroundColor = [UIColor colorWithRed:1.0 green:0.22 blue:0.18 alpha:0.92];
+    marker.layer.cornerRadius = 15.0;
+    marker.layer.borderWidth = 2.0;
+    marker.layer.borderColor = UIColor.whiteColor.CGColor;
+    marker.tag = (NSInteger)index;
+    UILabel *number = [[UILabel alloc] initWithFrame:marker.bounds];
+    number.text = [NSString stringWithFormat:@"%lu", (unsigned long)index + 1];
+    number.textAlignment = NSTextAlignmentCenter;
+    number.textColor = UIColor.whiteColor;
+    number.font = [UIFont boldSystemFontOfSize:12.0];
+    [marker addSubview:number];
+    marker.userInteractionEnabled = YES;
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(movePointMarker:)];
+    [marker addGestureRecognizer:pan];
+    [self.hostWindow addSubview:marker];
+    [self.pointMarkers addObject:marker];
+}
+
+- (void)movePointMarker:(UIPanGestureRecognizer *)gesture {
+    UIView *marker = gesture.view;
+    CGPoint delta = [gesture translationInView:self.hostWindow];
+    CGPoint center = marker.center;
+    center.x = MIN(MAX(15.0, center.x + delta.x), CGRectGetWidth(self.hostWindow.bounds) - 15.0);
+    center.y = MIN(MAX(15.0, center.y + delta.y), CGRectGetHeight(self.hostWindow.bounds) - 15.0);
+    marker.center = center;
+    [gesture setTranslation:CGPointZero inView:self.hostWindow];
+    NSUInteger index = (NSUInteger)marker.tag;
+    if (index < self.points.count) {
+        self.points[index] = [NSValue valueWithCGPoint:center];
+    }
+    self.xField.text = [NSString stringWithFormat:@"%.0f", center.x];
+    self.yField.text = [NSString stringWithFormat:@"%.0f", center.y];
 }
 
 - (void)clearPoints {
     [self.points removeAllObjects];
+    for (UIView *marker in self.pointMarkers) [marker removeFromSuperview];
+    [self.pointMarkers removeAllObjects];
     self.pointsLabel.text = @"Points: 0 · X/Y will be used at START";
+}
+
+- (void)touchTimeChanged:(UISlider *)slider {
+    self.touchTimeLabel.text = [NSString stringWithFormat:@"%.1f ms", slider.value];
+}
+
+- (void)decreaseTouchTime {
+    self.touchTimeSlider.value = MAX(0.1f, self.touchTimeSlider.value - 0.1f);
+    [self touchTimeChanged:self.touchTimeSlider];
+}
+
+- (void)increaseTouchTime {
+    self.touchTimeSlider.value = MIN(1000.0f, self.touchTimeSlider.value + 0.1f);
+    [self touchTimeChanged:self.touchTimeSlider];
 }
 
 - (void)startTapping {
@@ -182,21 +262,43 @@
     if (self.points.count == 0) {
         CGPoint point = CGPointMake(self.xField.text.doubleValue, self.yField.text.doubleValue);
         [self.points addObject:[NSValue valueWithCGPoint:point]];
+        [self createMarkerAtPoint:point index:0];
+        self.pointsLabel.text = @"Points: 1 · Drag the red dot to reposition";
     }
 
     self.scheduler.points = [self.points copy];
     self.scheduler.mode = (CHMTapMode)MAX(0, self.modeControl.selectedSegmentIndex);
-    self.scheduler.interval = MAX(0.01, self.intervalField.text.doubleValue);
-    self.scheduler.holdDuration = MAX(0.05, self.holdField.text.doubleValue);
+    self.scheduler.interval = MAX(0.0001, self.intervalField.text.doubleValue);
+    self.scheduler.holdDuration = MAX(0.0001, self.touchTimeSlider.value / 1000.0);
     self.scheduler.repeatCount = 0;
     [self.scheduler start];
-    self.statusLabel.text = self.scheduler.isRunning ? @"Running · Tap STOP to finish" : @"Not started · Check HID availability";
-    self.pointsLabel.text = [NSString stringWithFormat:@"Points: %lu · Sequence active", (unsigned long)self.points.count];
+    self.statusLabel.text = self.scheduler.isRunning
+        ? @"RUNNING · STOP to finish (delivery not yet verified)"
+        : @"START FAILED · Check HID support; see error above";
 }
 
 - (void)stopTapping {
     [self.scheduler stop];
     self.statusLabel.text = @"Stopped";
+}
+
+- (void)movePanel:(UIPanGestureRecognizer *)gesture {
+    CGPoint delta = [gesture translationInView:self.hostWindow];
+    CGPoint origin = self.panel.frame.origin;
+    origin.x = MIN(MAX(0.0, origin.x + delta.x), CGRectGetWidth(self.hostWindow.bounds) - CGRectGetWidth(self.panel.frame));
+    origin.y = MIN(MAX(0.0, origin.y + delta.y), CGRectGetHeight(self.hostWindow.bounds) - CGRectGetHeight(self.panel.frame));
+    self.panel.frame = (CGRect){origin, self.panel.frame.size};
+    [gesture setTranslation:CGPointZero inView:self.hostWindow];
+}
+
+- (void)zoomIn {
+    self.panelScale = MIN(1.35, self.panelScale + 0.05);
+    self.panel.transform = CGAffineTransformMakeScale(self.panelScale, self.panelScale);
+}
+
+- (void)zoomOut {
+    self.panelScale = MAX(0.75, self.panelScale - 0.05);
+    self.panel.transform = CGAffineTransformMakeScale(self.panelScale, self.panelScale);
 }
 
 - (void)moveHandle:(UIPanGestureRecognizer *)gesture {
@@ -210,12 +312,6 @@
     center.y = MIN(MAX(halfH, center.y), CGRectGetHeight(self.hostWindow.bounds) - halfH);
     self.handle.center = center;
     [gesture setTranslation:CGPointZero inView:self.hostWindow];
-    if (self.panelVisible) {
-        CGFloat height = CGRectGetHeight(self.panel.bounds);
-        CGFloat y = MIN(CGRectGetMaxY(self.handle.frame) + 10.0,
-                        CGRectGetHeight(self.hostWindow.bounds) - height - 12.0);
-        self.panel.frame = CGRectMake(12.0, MAX(12.0, y), CGRectGetWidth(self.panel.bounds), height);
-    }
 }
 
 @end
