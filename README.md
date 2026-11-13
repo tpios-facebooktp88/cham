@@ -13,7 +13,7 @@ Standalone iOS automation tweak/dylib intended for TrollStore + TrollFools.
 - [x] In-process floating handle and basic panel
 - [x] Tap timing/point scheduler abstraction
 - [x] OCR text matching primitives
-- [ ] Real touch-event backend and device validation
+- [x] Touch backend adapter contract with explicit unavailable state\n- [ ] Verified iOS touch-event provider and device validation
 - [ ] Touch Recorder capture/replay
 - [ ] Vision capture loop, ROI and cooldown
 - [ ] Full overlay controls, preferences and localization
@@ -24,4 +24,4 @@ Checked items are source-code milestones, not device-tested claims.
 Requires Theos and an iOS SDK. Run make package in a configured Theos environment. No CI workflow is enabled.
 
 ## Compatibility
-iOS touch synthesis is environment/version dependent. The scheduler is intentionally separated from the private touch-event backend. Synthetic touch support is not claimed until that backend is implemented and tested on the target device. The original Cham.dylib is not modified, linked, or required.
+iOS touch synthesis is environment/version dependent. The scheduler now emits correctly timed down/up phases through a backend adapter, including a real hold duration and two distinct taps for DOUBLE. The low-level iOS provider is intentionally fail-closed until its API and ABI are verified against the supplied reference binary and target iOS version. No synthetic touch success is claimed. The original Cham.dylib is not modified, linked, or required.

@@ -4,63 +4,161 @@
 @property (nonatomic, strong) dispatch_source_t timer;
 @property (nonatomic) NSUInteger pointIndex;
 @property (nonatomic) NSUInteger completedCycles;
+@property (nonatomic) NSUInteger tapsAtCurrentPoint;
+@property (nonatomic) BOOL touchIsDown;
+@property (nonatomic) CGPoint activePoint;
 @property (nonatomic, getter=isRunning) BOOL running;
 @end
 
 @implementation CHMTapScheduler
+
 - (instancetype)init {
+    return [self initWithBackend:[[CHMTouchBackend alloc] init]];
+}
+
+- (instancetype)initWithBackend:(CHMTouchBackend *)backend {
     self = [super init];
-    if (self) { _points = @[]; _mode = CHMTapModePoint; _interval = 0.5; _holdDuration = 0.1; }
+    if (self) {
+        _backend = backend;
+        _points = @[];
+        _mode = CHMTapModePoint;
+        _interval = 0.5;
+        _holdDuration = 0.1;
+        _doubleTapGap = 0.08;
+    }
     return self;
 }
 
 - (void)start {
     [self stop];
-    if (self.points.count == 0 || !self.eventHandler) return;
+    if (self.points.count == 0 || !self.backend.isAvailable) {
+        NSError *error = [NSError errorWithDomain:@"com.cham.autoclicker.tap"
+                                             code:1
+                                         userInfo:@{NSLocalizedDescriptionKey:
+                                                        self.points.count == 0 ? @"Add at least one tap point." :
+                                                        @"Tap backend is unavailable; no touch was sent."}];
+        if (self.errorHandler) self.errorHandler(error);
+        return;
+    }
+
     self.pointIndex = 0;
     self.completedCycles = 0;
+    self.tapsAtCurrentPoint = 0;
+    self.touchIsDown = NO;
     self.running = YES;
-    dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
-    self.timer = timer;
-    dispatch_source_set_timer(timer, DISPATCH_TIME_NOW, [self nextIntervalNanos], 2 * NSEC_PER_MSEC);
-    __weak typeof(self) weakSelf = self;
-    dispatch_source_set_event_handler(timer, ^{ [weakSelf emitNextTap]; });
-    dispatch_resume(timer);
+    [self scheduleAfter:0];
 }
 
 - (void)stop {
-    if (self.timer) { dispatch_source_cancel(self.timer); self.timer = nil; }
+    if (self.timer) {
+        dispatch_source_cancel(self.timer);
+        self.timer = nil;
+    }
+    if (self.touchIsDown) {
+        NSError *error = nil;
+        [self.backend dispatchPoint:self.activePoint phase:CHMTouchPhaseUp error:&error];
+        self.touchIsDown = NO;
+        if (error && self.errorHandler) self.errorHandler(error);
+    }
     self.running = NO;
 }
 
-- (uint64_t)nextIntervalNanos {
-    NSTimeInterval value = MAX(0.01, self.interval);
-    switch (self.mode) {
-        case CHMTapModeDouble: value = MIN(value, 0.12); break;
-        case CHMTapModeHold: value = MAX(value, self.holdDuration); break;
-        case CHMTapModeHuman: value *= 0.8 + ((double)arc4random_uniform(401) / 1000.0); break;
-        case CHMTapModeExtreme: value = MIN(value, 0.03); break;
-        case CHMTapModeUltra: value = MIN(value, 0.01); break;
-        case CHMTapModePoint: break;
-    }
-    return (uint64_t)(value * NSEC_PER_SEC);
+- (NSUInteger)tapsPerPoint {
+    return self.mode == CHMTapModeDouble ? 2 : 1;
 }
 
-- (void)emitNextTap {
-    if (!self.running || self.points.count == 0) { [self stop]; return; }
-    CGPoint point = self.points[self.pointIndex % self.points.count].CGPointValue;
-    NSTimeInterval hold = self.mode == CHMTapModeHold ? MAX(0.05, self.holdDuration) : 0.05;
-    self.eventHandler(point, YES, hold);
-    self.eventHandler(point, NO, hold);
-    self.pointIndex++;
-    if (self.pointIndex % self.points.count == 0) {
-        self.completedCycles++;
-        if (self.repeatCount > 0 && self.completedCycles >= self.repeatCount) { [self stop]; return; }
-    }
-    if (self.timer) {
-        uint64_t next = [self nextIntervalNanos];
-        dispatch_source_set_timer(self.timer, dispatch_time(DISPATCH_TIME_NOW, next), next, 2 * NSEC_PER_MSEC);
-    }
+- (NSTimeInterval)tapHoldDuration {
+    return self.mode == CHMTapModeHold ? MAX(0.05, self.holdDuration) : 0.06;
 }
-- (void)dealloc { [self stop]; }
+
+- (NSTimeInterval)nextInterval {
+    NSTimeInterval value = MAX(0.01, self.interval);
+    switch (self.mode) {
+        case CHMTapModeHuman:
+            value *= 0.8 + ((double)arc4random_uniform(401) / 1000.0);
+            break;
+        case CHMTapModeExtreme:
+            value = MIN(value, 0.03);
+            break;
+        case CHMTapModeUltra:
+            value = MIN(value, 0.01);
+            break;
+        case CHMTapModePoint:
+        case CHMTapModeDouble:
+        case CHMTapModeHold:
+            break;
+    }
+    return value;
+}
+
+- (void)scheduleAfter:(NSTimeInterval)delay {
+    if (!self.running) return;
+    if (self.timer) {
+        dispatch_source_cancel(self.timer);
+        self.timer = nil;
+    }
+    dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+    self.timer = timer;
+    uint64_t nanos = (uint64_t)(MAX(0.0, delay) * NSEC_PER_SEC);
+    dispatch_source_set_timer(timer, dispatch_time(DISPATCH_TIME_NOW, nanos), DISPATCH_TIME_FOREVER, 1 * NSEC_PER_MSEC);
+    __weak typeof(self) weakSelf = self;
+    dispatch_source_set_event_handler(timer, ^{
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        dispatch_source_cancel(self.timer);
+        self.timer = nil;
+        [self advance];
+    });
+    dispatch_resume(timer);
+}
+
+- (void)advance {
+    if (!self.running) return;
+
+    if (!self.touchIsDown) {
+        if (self.pointIndex >= self.points.count) {
+            self.completedCycles++;
+            if (self.repeatCount > 0 && self.completedCycles >= self.repeatCount) {
+                [self stop];
+                return;
+            }
+            self.pointIndex = 0;
+        }
+
+        self.activePoint = self.points[self.pointIndex].CGPointValue;
+        NSError *error = nil;
+        if (![self.backend dispatchPoint:self.activePoint phase:CHMTouchPhaseDown error:&error]) {
+            if (self.errorHandler && error) self.errorHandler(error);
+            [self stop];
+            return;
+        }
+        self.touchIsDown = YES;
+        [self scheduleAfter:[self tapHoldDuration]];
+        return;
+    }
+
+    NSError *error = nil;
+    if (![self.backend dispatchPoint:self.activePoint phase:CHMTouchPhaseUp error:&error]) {
+        if (self.errorHandler && error) self.errorHandler(error);
+        self.touchIsDown = NO;
+        [self stop];
+        return;
+    }
+    self.touchIsDown = NO;
+    self.tapsAtCurrentPoint++;
+
+    if (self.tapsAtCurrentPoint < [self tapsPerPoint]) {
+        [self scheduleAfter:MAX(0.02, self.doubleTapGap)];
+        return;
+    }
+
+    self.tapsAtCurrentPoint = 0;
+    self.pointIndex++;
+    [self scheduleAfter:[self nextInterval]];
+}
+
+- (void)dealloc {
+    [self stop];
+}
+
 @end
