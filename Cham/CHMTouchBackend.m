@@ -85,7 +85,7 @@ static BOOL CHMLoadHIDAPI(void) {
         CHMBackBoardHandle = dlopen(
             "/System/Library/PrivateFrameworks/BackBoardServices.framework/BackBoardServices",
             RTLD_NOW);
-        if (!CHMIOKitHandle || !CHMBackBoardHandle) return;
+        if (!CHMIOKitHandle) return;
 
         CHMCreateDigitizerEvent = (CHMCreateDigitizerEventFn)dlsym(CHMIOKitHandle, "IOHIDEventCreateDigitizerEvent");
         CHMCreateFingerEvent = (CHMCreateFingerEventFn)dlsym(CHMIOKitHandle, "IOHIDEventCreateDigitizerFingerEvent");
@@ -95,7 +95,9 @@ static BOOL CHMLoadHIDAPI(void) {
         CHMSetFloatValue = (CHMSetFloatValueFn)dlsym(CHMIOKitHandle, "IOHIDEventSetFloatValue");
         CHMAppendEvent = (CHMAppendEventFn)dlsym(CHMIOKitHandle, "IOHIDEventAppendEvent");
         CHMDispatchEvent = (CHMDispatchEventFn)dlsym(CHMIOKitHandle, "IOHIDEventSystemClientDispatchEvent");
-        CHMSetDigitizerInfo = (CHMSetDigitizerInfoFn)dlsym(CHMBackBoardHandle, "BKSHIDEventSetDigitizerInfo");
+        if (CHMBackBoardHandle) {
+            CHMSetDigitizerInfo = (CHMSetDigitizerInfoFn)dlsym(CHMBackBoardHandle, "BKSHIDEventSetDigitizerInfo");
+        }
 
         // BackBoardServices is optional in the original implementation.
         // The core IOKit event path remains available without this enrichment call.
@@ -125,7 +127,7 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
         return NO;
     }
     if (!CHMLoadHIDAPI()) {
-        CHMSetError(error, 5, @"The required IOKit or BackBoardServices HID entry points are unavailable.");
+        CHMSetError(error, 5, @"The required IOKit HID entry points are unavailable.");
         return NO;
     }
 
