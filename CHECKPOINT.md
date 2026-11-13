@@ -282,3 +282,14 @@ The first P0 source changes following the audit are now committed to `main`. The
 - UIKit `UITouchPhaseStationary` semantics and private API behavior still require iOS 16 device validation.
 - If the captured window or view is detached before UP, release is deliberately not redirected. The scheduler remains blocked and reports release unconfirmed; recovery behavior must be validated on device.
 - No build, GitHub Actions, Codemagic, Theos compile, or artifact generation was run. The user performs builds.
+
+
+
+## Build-error source audit — 2026-11-13
+
+- User reported a build failure after the lifecycle/source milestone and asked that the fix and workflow be recorded.
+- Static review found an Objective-C dot-syntax error in `Cham/CHMOverlay.m`: the scheduler declares `@property (nonatomic, readonly, getter=isRunning) BOOL running`, so property access must use `.running`. Calling `.isRunning` is not a declared property and can fail compilation.
+- Replaced both `self.scheduler.isRunning` expressions with `self.scheduler.running`.
+- Searched the current source for other `.isRunning` dot-property accesses; none remain in the reviewed source files.
+- Build was not run. This source correction is not a claim that the full project now compiles; the user's next build result remains the acceptance check.
+- **Build-failure workflow:** when the user reports a build error, first fetch latest `main`, inspect the exact source and build configuration, locate the earliest concrete compiler error, make the smallest correction, record it here, and leave all build execution to the user unless explicitly authorized.
