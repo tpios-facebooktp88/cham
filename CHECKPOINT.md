@@ -114,6 +114,7 @@ Correction made from this comparison:
 - Source change commit: `6273e204073a3e2b6e53064bdb92c9906d2a61d5`.
 - Scheduler release-failure correction: `stop` now clears `touchIsDown` only when the backend confirms UP; otherwise it retains the blocked state and reports an error. `start` retries stop and refuses to begin a new DOWN while a previous touch remains unconfirmed. The UP-failure path no longer clears the state before stop attempts release.
 - Source change commit: `8326a808df25e835f72f2a61814359e167619aa2`.
+- Dispatch-path audit: original binary and current source both conditionally enqueue through UIApplication first, then call HID event-system dispatch with the same parent event. Kept both calls and their order; no source change. Original binary also releases the created finger and parent events after dispatch, matching the current success-path release sequence. The precise ownership/retain contract of `IOHIDEventAppendEvent` and delivery behavior still cannot be proven from static call-site inspection alone; retain this as a runtime/API validation item.
 
 Still requiring audit:
 - Full UITouch/UIEvent phase and reuse lifecycle, including cleanup after UP and stop.
@@ -127,7 +128,7 @@ Still requiring audit:
 1. Compare the original binary's actual call sites and signatures with the declarations in `CHMTouchBackend.m`; do not infer ABI from symbol names alone.
 2. Verify event ownership and release behavior for parent and finger events.
 3. Trace DOWN/UP state and ensure stop/deallocation cannot leave a touch active.
-4. Determine whether calling both UIApplication `_enqueueHIDEvent:` and HID client dispatch duplicates delivery; do not assume both are required.
+4. Determine whether calling both UIApplication `_enqueueHIDEvent:` and HID client dispatch duplicates delivery; do not assume both are required. **Audit result (2026-11-13):** the original binary's touch path conditionally invokes UIApplication `_enqueueHIDEvent:` when the selector is supported, then invokes `IOHIDEventSystemClientDispatchEvent` on the same parent event. The current source preserves this order. No source change made; removing either call would diverge from the original without device evidence.
 5. Verify coordinate conversion and window/context selection.
 6. Keep the current single-finger limitation explicit until multi-touch is designed and tested.
 7. Validate only on the user's test device and report dispatch success separately from confirmed app-level touch delivery.
