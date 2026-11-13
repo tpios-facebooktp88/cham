@@ -117,8 +117,9 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, NSError **er
     const double radius = 0.04;
     const uint32_t fingerIndex = 1; // The scheduler currently drives one active finger.
 
+    uint64_t timestamp = mach_absolute_time();
     CHMIOHIDEventRef parent = CHMCreateDigitizerEvent(
-        kCFAllocatorDefault, mach_absolute_time(), 3, 0, 0, eventMask, 0,
+        kCFAllocatorDefault, timestamp, 3, 0, 0, eventMask, 0,
         point.x, point.y, 0.0, force, 0.0, 1, 1, 0);
     if (!parent) {
         CHMSetError(error, 8, @"IOHIDEventCreateDigitizerEvent returned null.");
@@ -126,7 +127,7 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, NSError **er
     }
 
     CHMIOHIDEventRef finger = CHMCreateFingerEvent(
-        kCFAllocatorDefault, mach_absolute_time(), fingerIndex, fingerIndex, eventMask,
+        kCFAllocatorDefault, timestamp, fingerIndex, fingerIndex, eventMask,
         point.x, point.y, 0.0, force, 0.0, 1, 1, 0);
     if (!finger) {
         CFRelease(parent);
