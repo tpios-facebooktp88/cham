@@ -97,9 +97,11 @@ static BOOL CHMLoadHIDAPI(void) {
         CHMDispatchEvent = (CHMDispatchEventFn)dlsym(CHMIOKitHandle, "IOHIDEventSystemClientDispatchEvent");
         CHMSetDigitizerInfo = (CHMSetDigitizerInfoFn)dlsym(CHMBackBoardHandle, "BKSHIDEventSetDigitizerInfo");
 
+        // BackBoardServices is optional in the original implementation.
+        // The core IOKit event path remains available without this enrichment call.
         if (!CHMCreateDigitizerEvent || !CHMCreateFingerEvent || !CHMCreateClient ||
             !CHMSetSenderID || !CHMSetIntegerValue || !CHMSetFloatValue ||
-            !CHMAppendEvent || !CHMDispatchEvent || !CHMSetDigitizerInfo) return;
+            !CHMAppendEvent || !CHMDispatchEvent) return;
 
         CHMEventClient = CHMCreateClient(kCFAllocatorDefault);
         available = CHMEventClient != NULL;
@@ -239,7 +241,9 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
     [touchEvent _addTouch:touch forDelayedDelivery:NO];
     backend.activeTouch = touch;
 
-    CHMSetDigitizerInfo(parent, contextID, 0, 0, NULL, 0, 0);
+    if (CHMSetDigitizerInfo) {
+        CHMSetDigitizerInfo(parent, contextID, 0, 0, NULL, 0, 0);
+    }
 
     SEL enqueueSelector = NSSelectorFromString(@"_enqueueHIDEvent:");
     if ([application respondsToSelector:enqueueSelector]) {
