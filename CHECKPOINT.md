@@ -253,3 +253,32 @@ Purpose: complete one coherent audit of the existing Tap/HID backend before furt
 - Original binary lifecycle handling: notification evidence found; exact behavior remains open.
 - iOS lifecycle timing and coordinate-space guidance: checked against current Apple documentation.
 - No source-code edits, build, Actions run, or device test performed in this pass.
+
+
+## Implementation update — 2026-11-13
+
+The first P0 source changes following the audit are now committed to `main`. These are source-only changes; no build, injection, or device test was run.
+
+### Changes made
+
+- `CHMTouchBackend` now retains the exact DOWN target window and view, plus the window context ID and point, until the matching UP dispatch path completes.
+- UP no longer calls the key-window selector or hit-tests again. It uses the captured window/view/context/point. If the original window/view is no longer valid, the backend refuses to redirect UP to a different target and retains the active-touch state for diagnosis/retry.
+- A second DOWN is rejected while the backend still retains an active UITouch.
+- `CHMTapScheduler.hasUnconfirmedTouch` exposes whether the scheduler still considers a release unconfirmed.
+- `CHMOverlay` observes `UISceneWillDeactivateNotification` for its owning scene. For a non-scene window, it falls back to `UIApplicationWillResignActiveNotification`. The observer runs on the main queue and requests scheduler STOP before the scene/app deactivation proceeds; the observer token is removed during overlay deallocation.
+- STOP status now distinguishes a retained/unconfirmed release from a completed UP dispatch path. It explicitly says delivery remains unverified.
+
+### Source-level checks performed
+
+- Confirmed active window and view are strongly retained for the contact lifetime.
+- Confirmed UP uses the captured window, view, context ID, and point.
+- Confirmed key-window lookup and hit-testing occur only on DOWN.
+- Confirmed scene-scoped deactivation observer, app fallback observer, and observer cleanup.
+- Confirmed the GitHub Actions workflow remains manual-only (`workflow_dispatch`).
+
+### Remaining open items
+
+- Coordinate-space contract is unchanged and remains open. The UI points are currently window-local; HID coordinates still receive the same numeric point. Do not change conversion math until original call-site tracing/device evidence closes this.
+- UIKit `UITouchPhaseStationary` semantics and private API behavior still require iOS 16 device validation.
+- If the captured window or view is detached before UP, release is deliberately not redirected. The scheduler remains blocked and reports release unconfirmed; recovery behavior must be validated on device.
+- No build, GitHub Actions, Codemagic, Theos compile, or artifact generation was run. The user performs builds.
