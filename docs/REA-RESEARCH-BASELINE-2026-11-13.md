@@ -181,3 +181,19 @@ The research workflow has now been updated on `main` at commit `05d14158e9aaf5a7
 - `0xcecc` — smart tap
 
 This next run has **not yet been dispatched**. It will produce one function dossier and one decompilation JSON per address. Do not start Theos/Codemagic build workflows during this analysis.
+
+
+## Workflow optimization — one persistent REA session
+
+- Research runner: `scripts/rea-research-batch.mjs`
+- Workflow: `.github/workflows/rea-research.yml`
+- Runner commit: `0bdf4172bc30fb36e1cc27b93dc7430e1703ebc5`
+- Workflow commit: `0220e6d11ab9f19f3079866914b5e34a2b36eefc`
+- Branch: `main`
+- Status: committed; **not yet executed or runtime-validated**.
+
+The earlier workflow used separate one-shot REA CLI invocations for inventory, searches, xrefs, traces, function dossiers and decompilation. REA documents that each CLI invocation is a separate process. The revised runner starts one REA MCP stdio server, opens the temporary arm64 slice once, waits for the Ghidra-backed overview, and submits all six known procedure entries to one `batch_decompile` call in the same persistent session.
+
+The new batch targets are `0x9a5c`, `0x9a74`, `0x9a8c`, `0xba18`, `0xbdc4`, and `0xcecc`. The previous run #3 xrefs and traces remain the source for selecting these addresses; they are no longer recomputed in this focused follow-up. The batch output, tool catalog, overview and environment report are uploaded together as one Actions artifact.
+
+This reduces repeated provider startup/auto-analysis. It does not guarantee a specific wall-clock duration; Ghidra's first import and auto-analysis still occur once, and the batch decompilation itself may take time. The original `Cham.dylib` remains hash-verified and untouched. No Theos or Codemagic build is part of this workflow.
