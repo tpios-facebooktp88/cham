@@ -108,10 +108,10 @@ jobs:
             echo "Commit: $GITHUB_SHA"
             echo "Original binary: Cham.dylib"
             sha256sum Cham.dylib
-            stat --printf='Original size: %s bytes\\n' Cham.dylib
+            stat --printf='Original size: %s bytes\n' Cham.dylib
             echo "Analysis slice: arm64"
             sha256sum "$THIN_BINARY"
-            stat --printf='Thin slice size: %s bytes\\n' "$THIN_BINARY"
+            stat --printf='Thin slice size: %s bytes\n' "$THIN_BINARY"
             rea --version
             node --version
             java -version 2>&1
