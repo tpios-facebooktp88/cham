@@ -10,7 +10,7 @@ Standalone iOS automation tweak/dylib intended for TrollStore + TrollFools.
 
 ## Current status
 - [x] Initial Theos scaffold
-- [x] In-process floating handle and basic panel
+- [x] Draggable floating handle and initial Tap Mode menu controls (source only)
 - [x] Tap timing/point scheduler abstraction
 - [x] OCR text matching primitives
 - [x] Primary HID event provider source implementation (IOHID + BackBoardServices)
