@@ -68,7 +68,7 @@ Treat symbol names and wrapper behavior as research leads. Verify exact symbol a
 
 ## Current repository facts checked on 2026-11-13
 
-Latest `main` commit at checkpoint refresh: `8326a808df25e835f72f2a61814359e167619aa2`.
+Latest source-code commit (checkpoint-only commit follows): `8326a808df25e835f72f2a61814359e167619aa2`.
 
 Current source tree includes:
 - `Cham/CHMOverlay.h`, `Cham/CHMOverlay.m`
