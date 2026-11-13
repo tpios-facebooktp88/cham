@@ -14,7 +14,8 @@ Standalone iOS automation tweak/dylib intended for TrollStore + TrollFools.
 - [x] Tap timing/point scheduler abstraction
 - [x] OCR text matching primitives
 - [x] Primary HID event provider source implementation (IOHID + BackBoardServices)
-- [ ] UIKit event bridge (_enqueueHIDEvent, UITouch and UIEvent delivery)
+- [x] UIApplication `_enqueueHIDEvent:` path
+- [ ] UITouch and UIEvent state bridge
 - [ ] Device validation on iOS 16 (event delivery, DOWN/UP lifecycle and stop-time release)
 - [ ] Touch Recorder capture/replay
 - [ ] Vision capture loop, ROI and cooldown
@@ -26,4 +27,4 @@ Checked items are source-code milestones, not device-tested claims. The primary 
 Requires Theos and an iOS SDK. Run make package in a configured Theos environment. No CI workflow is enabled.
 
 ## Compatibility
-The current provider dynamically resolves the HID and BackBoardServices entry points, constructs a parent Digitizer event and a finger event, applies the active window context ID, and dispatches through the HID event-system client. The reference binary also routes through UIWindow/UIApplication's _enqueueHIDEvent: path and maintains UITouch/UIEvent state; that UIKit bridge is not implemented yet. The scheduler's phase contract is DOWN = 0 and UP = 1. API availability and a dispatch call do not prove that iOS accepted or delivered the touch; device validation is still required. The original Cham.dylib is not modified, linked, or required.
+The current provider dynamically resolves the HID and BackBoardServices entry points, constructs a parent Digitizer event and a finger event, applies the active window context ID, and dispatches through the HID event-system client. The provider also queues the event through UIApplication's `_enqueueHIDEvent:` selector. The reference binary additionally maintains UITouch/UIEvent state; that state bridge is not implemented yet. The scheduler's phase contract is DOWN = 0 and UP = 1. API availability and a dispatch call do not prove that iOS accepted or delivered the touch; device validation is still required. The original Cham.dylib is not modified, linked, or required.
