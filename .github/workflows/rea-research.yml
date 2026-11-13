@@ -36,6 +36,14 @@ jobs:
           file Cham.dylib
           stat --printf='Size: %s bytes\n' Cham.dylib
 
+      - name: Install LLVM lipo
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y llvm-18
+          command -v llvm-lipo-18
+
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -86,32 +94,60 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p research-output
+
+          # REA's Ghidra provider cannot choose between multiple foreign slices
+          # in a universal Mach-O. Analyze the original arm64 slice without
+          # modifying the checked-in original binary.
+          THIN_BINARY="$RUNNER_TEMP/Cham-arm64.dylib"
+          llvm-lipo-18 Cham.dylib -thin arm64 -output "$THIN_BINARY"
+          llvm-lipo-18 -info "$THIN_BINARY"
+          file "$THIN_BINARY"
+
           {
             echo "Repository: $GITHUB_REPOSITORY"
             echo "Commit: $GITHUB_SHA"
-            echo "Binary: Cham.dylib"
+            echo "Original binary: Cham.dylib"
             sha256sum Cham.dylib
-            stat --printf='Size: %s bytes\n' Cham.dylib
+            stat --printf='Original size: %s bytes\\n' Cham.dylib
+            echo "Analysis slice: arm64"
+            sha256sum "$THIN_BINARY"
+            stat --printf='Thin slice size: %s bytes\\n' "$THIN_BINARY"
             rea --version
             node --version
             java -version 2>&1
+            llvm-lipo-18 -info "$THIN_BINARY"
           } > research-output/environment.txt
 
-          rea analyze "$GITHUB_WORKSPACE/Cham.dylib" --provider ghidra --json \
-            > research-output/overview.json
+          run_rea() {
+            local output="$1"
+            shift
+            local error_log="${output%.json}.stderr.log"
+            if "$@" > "$output" 2> "$error_log"; then
+              return 0
+            else
+              local status=$?
+              echo "REA command failed (exit $status): $*" >&2
+              test ! -s "$error_log" || cat "$error_log" >&2
+              test ! -s "$output" || cat "$output" >&2
+              return "$status"
+            fi
+          }
 
-          rea search "$GITHUB_WORKSPACE/Cham.dylib" "fakeTouchId:AtScreenPoint:inWindow:withTouchPhase:" --provider ghidra --json \
-            > research-output/search-fake-touch.json
-          rea search "$GITHUB_WORKSPACE/Cham.dylib" "smartTapAtScreenPoint:" --provider ghidra --json \
-            > research-output/search-smart-tap.json
-          rea search "$GITHUB_WORKSPACE/Cham.dylib" "_normalTapAt:inWindow:duration:" --provider ghidra --json \
-            > research-output/search-normal-tap.json
-          rea search "$GITHUB_WORKSPACE/Cham.dylib" "_doubleTapAt:inWindow:" --provider ghidra --json \
-            > research-output/search-double-tap.json
-          rea search "$GITHUB_WORKSPACE/Cham.dylib" "_extremeBurstInWindow:" --provider ghidra --json \
-            > research-output/search-extreme.json
-          rea search "$GITHUB_WORKSPACE/Cham.dylib" "_ultraTapInWindow:" --provider ghidra --json \
-            > research-output/search-ultra.json
+          run_rea research-output/overview.json \
+            rea analyze "$THIN_BINARY" --provider ghidra --json
+
+          run_rea research-output/search-fake-touch.json \
+            rea search "$THIN_BINARY" "fakeTouchId:AtScreenPoint:inWindow:withTouchPhase:" --provider ghidra --json
+          run_rea research-output/search-smart-tap.json \
+            rea search "$THIN_BINARY" "smartTapAtScreenPoint:" --provider ghidra --json
+          run_rea research-output/search-normal-tap.json \
+            rea search "$THIN_BINARY" "_normalTapAt:inWindow:duration:" --provider ghidra --json
+          run_rea research-output/search-double-tap.json \
+            rea search "$THIN_BINARY" "_doubleTapAt:inWindow:" --provider ghidra --json
+          run_rea research-output/search-extreme.json \
+            rea search "$THIN_BINARY" "_extremeBurstInWindow:" --provider ghidra --json
+          run_rea research-output/search-ultra.json \
+            rea search "$THIN_BINARY" "_ultraTapInWindow:" --provider ghidra --json
 
       - name: Upload REA research reports
         if: always()
