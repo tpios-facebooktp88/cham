@@ -30,6 +30,10 @@
     return self;
 }
 
+- (BOOL)hasUnconfirmedTouch {
+    return self.touchIsDown;
+}
+
 - (void)start {
     [self stop];
     if (self.touchIsDown) {
