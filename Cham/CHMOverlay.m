@@ -206,7 +206,8 @@
     marker.layer.cornerRadius = 15.0;
     marker.layer.borderWidth = 2.0;
     marker.layer.borderColor = UIColor.whiteColor.CGColor;
-    marker.tag = (NSInteger)index;
+    marker.tag = 0x43484D;
+    marker.accessibilityIdentifier = [NSString stringWithFormat:@"%lu", (unsigned long)index];
     UILabel *number = [[UILabel alloc] initWithFrame:marker.bounds];
     number.text = [NSString stringWithFormat:@"%lu", (unsigned long)index + 1];
     number.textAlignment = NSTextAlignmentCenter;
@@ -228,7 +229,7 @@
     center.y = MIN(MAX(15.0, center.y + delta.y), CGRectGetHeight(self.hostWindow.bounds) - 15.0);
     marker.center = center;
     [gesture setTranslation:CGPointZero inView:self.hostWindow];
-    NSUInteger index = (NSUInteger)marker.tag;
+    NSUInteger index = (NSUInteger)marker.accessibilityIdentifier.integerValue;
     if (index < self.points.count) {
         self.points[index] = [NSValue valueWithCGPoint:center];
     }
