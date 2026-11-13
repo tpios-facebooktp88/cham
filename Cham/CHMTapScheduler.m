@@ -44,7 +44,7 @@
         if (self.errorHandler) self.errorHandler(error);
         return;
     }
-    if (self.points.count == 0 || !self.backend.isAvailable) {
+    if (self.points.count == 0 || !self.backend.available) {
         NSError *error = [NSError errorWithDomain:@"com.cham.autoclicker.tap"
                                              code:1
                                          userInfo:@{NSLocalizedDescriptionKey:
