@@ -19,6 +19,7 @@ typedef NS_ENUM(NSInteger, CHMTapMode) {
 @property (nonatomic, strong) CHMTouchBackend *backend;
 @property (nonatomic, copy, nullable) void (^errorHandler)(NSError *error);
 @property (nonatomic, readonly, getter=isRunning) BOOL running;
+@property (nonatomic, readonly) BOOL hasUnconfirmedTouch;
 
 - (instancetype)initWithBackend:(CHMTouchBackend *)backend;
 - (void)start;
