@@ -197,3 +197,48 @@ The earlier workflow used separate one-shot REA CLI invocations for inventory, s
 The new batch targets are `0x9a5c`, `0x9a74`, `0x9a8c`, `0xba18`, `0xbdc4`, and `0xcecc`. The previous run #3 xrefs and traces remain the source for selecting these addresses; they are no longer recomputed in this focused follow-up. The batch output, tool catalog, overview and environment report are uploaded together as one Actions artifact.
 
 This reduces repeated provider startup/auto-analysis. It does not guarantee a specific wall-clock duration; Ghidra's first import and auto-analysis still occur once, and the batch decompilation itself may take time. The original `Cham.dylib` remains hash-verified and untouched. No Theos or Codemagic build is part of this workflow.
+
+
+## REA run #4 — persistent MCP batch decompilation
+
+- Run ID: `43390728802` (run #4), job ID `131769704896`
+- Commit analyzed: `7000ee5ed9b20950327585bf0a419446167b502f`
+- Result: success; elapsed about 1m48s (08:07:16Z–08:09:04Z)
+- Artifact: `Cham-REA-Research-4`, ID `14020935714`, 953,308 bytes, SHA-256 `7f307e7052b4196ca684694a54f0ff7073350b14ef4d1d0d6df1ecc30249bc7a`, expires 2027-02-11.
+- All 11 workflow steps succeeded, including original-binary hash verification, Ghidra readiness, REA analysis and artifact upload.
+- Original universal binary was not modified. The analyzed arm64 slice hash matches the prior verified slice: `2fe3e601883f42ba5ff0975323fcaf6e042c6f5c17b1f5a9c53b637a978b414d`.
+- Binary overview: 736 procedures, 1,171 defined strings, 33 segments; discovery coverage remains unknown.
+- Batch decompile: 6/6 succeeded for `0x9a5c`, `0x9a74`, `0x9a8c`, `0xba18`, `0xbdc4`, `0xcecc`.
+- The batch was submitted through one persistent REA MCP stdio connection. The MCP catalog was saved in the artifact for reproducibility.
+- Timing improvement: prior run #3 took about 12m29s; run #4 took about 1m48s. This is one observed run, not a guaranteed duration for future or deeper analysis.
+
+### Touch primitive — confirmed static observations
+
+**Core procedure: `0x9a8c` — `fakeTouchId:AtScreenPoint:inWindow:withTouchPhase:force:radius:`**
+
+Ghidra pseudocode shows this routine:
+1. Resolves a touch identifier, allocating/looking up an available point ID when needed.
+2. Converts the supplied point from the given window and checks it against the window bounds; an out-of-bounds point returns a negative result.
+3. Stores/reuses `UITouch` objects in a static `NSMutableDictionary` keyed by point ID.
+4. Updates touch state through helper `FUN_0000a464`.
+5. Obtains `UIApplication.sharedApplication` and probes private selectors dynamically using `NSSelectorFromString` and `respondsToSelector:`, including `_touchesEvent`, `_clearTouches`, `_setHidEvent_`, `_setHIDEvent_`, `_setTimestamp_`, and `_addTouch:forDelayedDelivery:`.
+6. Creates/obtains a HID event through `FUN_0000a9d8`, attaches it to the touch/application event where the selectors are available, assigns a system-uptime timestamp, and releases the event with `CFRelease`.
+7. Iterates the tracked touches and adds them for delayed delivery, then calls `UIApplication.sendEvent:`.
+8. Removes touch objects for terminal phases (phase values 3/4 in the decompiler's observed branch) or updates a retained touch; finally performs `hitTest:withEvent:`.
+9. Uses `FUN_0000a28c` as an alternate/system-touch path. The exact behavior of that helper is not yet decompiled.
+
+These observations establish use of UIKit `UITouch` plus dynamically resolved private UIApplication selectors and an HID-event helper. They do **not** yet establish the complete HID event structure, the exact meaning of every phase value, runtime acceptance by iOS, or which branch is taken on a particular device/OS version.
+
+**Wrappers**
+- `0x9a5c`: delegates to the core routine with fixed force `0.5` and radius `0.04`.
+- `0x9a74`: also delegates with `0.5` and `0.04`; its decompiled `preferSystem` parameter is not visibly consumed in this wrapper. Verify the Objective-C ABI/selector and callers before concluding the flag is ignored globally.
+
+**Tap modes**
+- `0xba18` normal tap: enables the touch subsystem, injects phase 0 through the core fake-touch routine, then schedules delayed blocks. Duration is clamped to at least 0.0001 seconds. When state `DAT_00031c30 == 2`, an additional callback is scheduled at 30% of the duration; the final callback is scheduled at the full duration.
+- `0xbdc4` double tap: begins with phase 0, reads a configured delay `DAT_00031ad8` (minimum 0.0001), obtains another timing value through `FUN_00008238` (minimum 0.0005 and capped by the observed `fmin` constant), then schedules `FUN_0000bf34`. The exact phase sequence is in the callback and remains to be decompiled.
+- `0xcecc` smart tap: runs only when the busy flag `DAT_00031be1` is clear, `FUN_00005f30()` succeeds, and `targetApplicationWindow` returns a window. It sets the busy flag, enables the touch subsystem, sends phase 0, then schedules `FUN_0000d028` after `DAT_00031ad8` (minimum 0.0001). Failure resets the touch subsystem and busy flag.
+
+### Next focused batch
+
+Decompile the helper/callback procedures in one REA MCP batch, using addresses grounded by the current pseudocode and earlier trace:
+`0x0a28c`, `0x0a464`, `0x0a9d8`, `0xbbec`, `0xbc90`, `0xbf34`, `0xd028`, plus `0x09698`, `0x093b8`, `0x08238`, `0x05f30` if confirmed as procedure entries by REA's resolver. Focus first on touch phase transitions, HID event construction, and release/cleanup callbacks. Do not infer runtime behavior without device testing.
