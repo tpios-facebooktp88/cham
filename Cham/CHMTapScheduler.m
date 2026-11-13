@@ -1,4 +1,5 @@
 #import "CHMTapScheduler.h"
+#import <UIKit/UIKit.h>
 
 @interface CHMTapScheduler ()
 @property (nonatomic, strong) dispatch_source_t timer;
