@@ -13,16 +13,17 @@ Standalone iOS automation tweak/dylib intended for TrollStore + TrollFools.
 - [x] In-process floating handle and basic panel
 - [x] Tap timing/point scheduler abstraction
 - [x] OCR text matching primitives
-- [x] Touch backend adapter with dynamically resolved IOKit and BackBoardServices provider
+- [x] Primary HID event provider source implementation (IOHID + BackBoardServices)
+- [ ] UIKit event bridge (_enqueueHIDEvent, UITouch and UIEvent delivery)
 - [ ] Device validation on iOS 16 (event delivery, DOWN/UP lifecycle and stop-time release)
 - [ ] Touch Recorder capture/replay
 - [ ] Vision capture loop, ROI and cooldown
 - [ ] Full overlay controls, preferences and localization
 
-Checked items are source-code milestones, not device-tested claims. The HID provider implementation has not been built or validated on a device.
+Checked items are source-code milestones, not device-tested claims. The primary HID provider has not been built or validated on a device.
 
 ## Build
 Requires Theos and an iOS SDK. Run make package in a configured Theos environment. No CI workflow is enabled.
 
 ## Compatibility
-The touch provider resolves the HID and BackBoardServices entry points at runtime, constructs a parent Digitizer event and a finger event, applies the active window context ID, and dispatches through the HID event-system client. The scheduler's phase contract is DOWN = 0 and UP = 1. API availability and a dispatch call do not prove that iOS accepted or delivered the touch; device validation is still required. The original Cham.dylib is not modified, linked, or required.
+The current provider dynamically resolves the HID and BackBoardServices entry points, constructs a parent Digitizer event and a finger event, applies the active window context ID, and dispatches through the HID event-system client. The reference binary also routes through UIWindow/UIApplication's _enqueueHIDEvent: path and maintains UITouch/UIEvent state; that UIKit bridge is not implemented yet. The scheduler's phase contract is DOWN = 0 and UP = 1. API availability and a dispatch call do not prove that iOS accepted or delivered the touch; device validation is still required. The original Cham.dylib is not modified, linked, or required.
