@@ -149,3 +149,65 @@ Still requiring audit:
 - Successful injection is not proof that an app received the intended touch.
 - Only mark a feature device-tested after the user reports a reproducible test result.
 - Keep original-binary observations, current-source facts, and device-test results clearly separated.
+
+
+## Consolidated backend research plan (2026-11-13)
+
+Purpose: complete one coherent audit of the existing Tap/HID backend before further implementation. This is a research plan and status record, not a claim of device validation. No source code or build configuration is changed by this plan.
+
+### Research workstreams and priority
+
+| Priority | Workstream | Questions to close | Evidence required |
+|---|---|---|---|
+| P0 | Touch lifecycle and failure recovery | What happens on DOWN success / UP failure, STOP, rapid START-STOP, deactivation, backgrounding, scene disconnect, and backend loss? Can any path leave a contact logically down? | Scheduler/backend state trace, lifecycle notification flow, device test |
+| P0 | Coordinate and window correctness | Are saved points window-local, screen-logical, or fixed-screen coordinates? Does orientation, safe area, scene/window selection, display scale, or external display alter the mapping? | Original method call-site trace, UIKit coordinate-space rules, device tests in portrait/landscape |
+| P0 | UIKit bridge lifecycle | Is Stationary the correct UITouch phase for both HID DOWN and UP? How are the shared UIEvent and UITouch retained, cleared, and reused by UIKit on iOS 16? | Full original call-site comparison; runtime diagnostics on iOS 16 |
+| P1 | HID ABI and event ownership | Verify exact function signatures, parameter widths/order, append semantics, and CF ownership for parent/finger events on every success/error branch. | Original arm64/arm64e disassembly, SDK/header evidence where public, runtime memory diagnostics |
+| P1 | Dispatch semantics | Confirm the original conditional UIApplication enqueue followed by HID-client dispatch; establish whether target apps receive one event, not zero or duplicate. | Original call-site comparison and target-app event-delivery test |
+| P1 | Scheduler semantics | Confirm POINT/DOUBLE/HOLD timing, repeat boundaries, interval floors, single-finger sequential multi-point behavior, and behavior when configuration changes while running. | State-machine review and deterministic test matrix |
+| P2 | Diagnostics and readiness | Add bounded, actionable diagnostics only after the failure states are defined; distinguish API-loaded, dispatch-called, and app-received. | Log review and device test |
+| P2 | Scope handoff | Only after Tap Mode is stable, begin Recorder, then Vision OCR, then remaining overlay/preferences. | Acceptance checklist per feature |
+
+### Initial research progress
+
+**Verified from current repository source on `main`:**
+- The backend requires the main thread, selects a key window, stores points as `CGPoint`, and uses the same point for `window hitTest:`, UITouch location, and HID event coordinates.
+- The overlay creates and moves points in `hostWindow.bounds` coordinates. It does not currently convert those points to the screen's fixed coordinate space.
+- The original wrapper name includes `AtScreenPoint`, while Apple's UIKit documentation distinguishes window and screen coordinate spaces and notes that orientation affects those coordinate spaces. Coordinate equivalence is therefore not yet proven; do not change coordinate math until the original conversion path is fully traced.
+- The backend currently has no scene/app deactivation or background observer. Apple's lifecycle guidance says apps should quiet work and invalidate timers on deactivation/background; scene notifications are available. A pending DOWN must be treated as a safety-critical stop/release case.
+- Scheduler state is serial and single-finger. The original method accepts an explicit touch ID; current code pins finger index to 1. Multi-point currently means sequential taps at several locations, not simultaneous multi-touch.
+- On an UP failure, scheduler state is retained and START is blocked. If STOP's release attempt also fails, there is no autonomous retry path; state remains blocked until another explicit start/stop attempt or object teardown.
+- The original binary and current source both conditionally call UIApplication `_enqueueHIDEvent:` and then HID-client dispatch on the same parent event. The current order is preserved pending device-level delivery testing.
+- The current source releases the created finger and parent events after dispatch and releases already-created events on checked pre-dispatch error branches. Append ownership semantics and UIKit's internal retention behavior remain unproven from source alone.
+- `Entry.xm` only schedules overlay attachment after launch; it does not register lifecycle observers.
+
+**Verified from original binary / prior static analysis:**
+- Original file SHA-256: `bfeeced4b8d57d8f384fbe539fa2c575b98405172d4f32655ce79bd4ef1c4fdd`.
+- Original Objective-C wrapper accepts an explicit touch ID, screen point, window, phase, force, and radius.
+- Original normal tap path uses phase 0 for initial contact and phase 1 for completion; current DOWN=0 / UP=1 mapping is consistent.
+- Original dispatch path conditionally uses UIApplication enqueue, then HID-client dispatch; both calls should remain until device evidence justifies a change.
+
+### Research order and exit gates
+
+1. Finish original-binary tracing for coordinate conversion, UIKit phase values, touch-ID use, append/release order, and lifecycle-related selectors.
+2. Map all scheduler states and every failure/stop/deallocation path. Define a safe state invariant: no new DOWN while an earlier contact is unconfirmed UP.
+3. Specify foreground/inactive/background/scene-disconnect behavior and how a release attempt is made while the owning window/context is still valid.
+4. Specify coordinate contracts at the UI boundary and HID boundary; validate portrait, landscape, safe-area offsets, and display scale.
+5. Prepare an iOS 16 device matrix: single tap, double tap, hold, each interval mode, multiple sequential points, stop during DOWN, rapid start/stop, app interruption, app switch/background, orientation change, window loss, and backend-unavailable cases.
+6. Only then make the smallest code changes, one focused commit per concern. User performs all builds; no Actions/Codemagic/Theos build without explicit authorization.
+7. Do not call Tap Mode complete until the user confirms reproducible app-level event delivery on device.
+
+### External platform references
+- Apple UIKit coordinate spaces: window and screen coordinate spaces change with interface orientation; explicit conversion APIs are provided. https://developer.apple.com/documentation/uikit/uicoordinatespace
+- Apple UIKit background preparation: apps should quiet work and invalidate active timers on deactivation, and clean up when entering background. https://developer.apple.com/documentation/uikit/preparing-your-ui-to-run-in-the-background
+- Apple scene lifecycle: each scene has its own lifecycle; scene background notifications are available. https://developer.apple.com/documentation/uikit/managing-your-app-s-life-cycle
+
+### Current research status
+- Repository/source inventory: complete.
+- Original binary identity/hash rechecked: complete.
+- Dual-dispatch order comparison: complete.
+- Lifecycle/background gap identified: complete as a source finding; behavior still needs device validation.
+- Coordinate contract: open.
+- Full UIKit phase/retention semantics: open.
+- Exact IOHID append ownership and runtime event receipt: open.
+- No source-code edits, build, Actions run, or device test performed in this research pass.
