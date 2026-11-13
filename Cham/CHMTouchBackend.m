@@ -286,6 +286,9 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
     [touchEvent _setTimestamp:eventTime];
     [touchEvent _addTouch:touch forDelayedDelivery:NO];
 
+    // The original Cham UIKit path explicitly delivers the populated UIEvent.
+    [application sendEvent:touchEvent];
+
     if (CHMSetDigitizerInfo && contextID != 0) {
         CHMSetDigitizerInfo(0, 0, parent, contextID, 0, 0, 0);
     }
