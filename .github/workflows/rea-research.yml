@@ -118,69 +118,13 @@ jobs:
             llvm-lipo-18 -info "$THIN_BINARY"
           } > research-output/environment.txt
 
-          run_rea() {
-            local output="$1"
-            shift
-            local error_log="${output%.json}.stderr.log"
-            if "$@" > "$output" 2> "$error_log"; then
-              return 0
-            else
-              local status=$?
-              echo "REA command failed (exit $status): $*" >&2
-              test ! -s "$error_log" || cat "$error_log" >&2
-              test ! -s "$output" || cat "$output" >&2
-              return "$status"
-            fi
-          }
-
-          run_rea research-output/overview.json \
-            rea analyze "$THIN_BINARY" --provider ghidra --json
-
-          run_rea research-output/search-fake-touch.json \
-            rea search "$THIN_BINARY" "fakeTouchId:AtScreenPoint:inWindow:withTouchPhase:" --provider ghidra --json
-          run_rea research-output/search-smart-tap.json \
-            rea search "$THIN_BINARY" "smartTapAtScreenPoint:" --provider ghidra --json
-          run_rea research-output/search-normal-tap.json \
-            rea search "$THIN_BINARY" "_normalTapAt:inWindow:duration:" --provider ghidra --json
-          run_rea research-output/search-double-tap.json \
-            rea search "$THIN_BINARY" "_doubleTapAt:inWindow:" --provider ghidra --json
-          run_rea research-output/search-extreme.json \
-            rea search "$THIN_BINARY" "_extremeBurstInWindow:" --provider ghidra --json
-          run_rea research-output/search-ultra.json \
-            rea search "$THIN_BINARY" "_ultraTapInWindow:" --provider ghidra --json
-
-          # Resolve references from Objective-C selector strings into method
-          # metadata and executable code, then retain pseudocode for review.
-          run_rea research-output/xrefs-fake-touch.json \
-            rea xrefs "$THIN_BINARY" 0x297f3 --provider ghidra --json
-          run_rea research-output/xrefs-fake-touch-prefer-system.json \
-            rea xrefs "$THIN_BINARY" 0x28baf --provider ghidra --json
-          run_rea research-output/xrefs-normal-tap.json \
-            rea xrefs "$THIN_BINARY" 0x28e07 --provider ghidra --json
-          run_rea research-output/xrefs-double-tap.json \
-            rea xrefs "$THIN_BINARY" 0x28ae1 --provider ghidra --json
-          run_rea research-output/xrefs-extreme.json \
-            rea xrefs "$THIN_BINARY" 0x28b08 --provider ghidra --json
-          run_rea research-output/xrefs-ultra.json \
-            rea xrefs "$THIN_BINARY" 0x291ad --provider ghidra --json
-          run_rea research-output/xrefs-smart-tap.json \
-            rea xrefs "$THIN_BINARY" 0x2a575 --provider ghidra --json
-
-          run_rea research-output/trace-fake-touch.json \
-            rea trace "$THIN_BINARY" "fakeTouchId:AtScreenPoint:inWindow:withTouchPhase:" --provider ghidra --json
-          run_rea research-output/trace-tap-modes.json \
-            rea trace "$THIN_BINARY" "smartTapAtScreenPoint:" --provider ghidra --json
-
-          # Resolve the Objective-C method procedures exposed by the xref/trace
-          # results. These addresses are procedure entries, not selector-string
-          # addresses. Preserve both function dossiers and decompiled pseudocode.
-          for address in 0x9a5c 0x9a74 0x9a8c 0xba18 0xbdc4 0xcecc; do
-            safe_address="${address#0x}"
-            run_rea "research-output/function-${safe_address}.json" \\
-              rea function "$THIN_BINARY" "$address" --provider ghidra --json
-            run_rea "research-output/decompile-${safe_address}.json" \\
-              rea decompile "$THIN_BINARY" "$address" --provider ghidra --json
-          done
+          # CLI commands are one-shot processes. Keep one REA MCP server alive
+          # so Ghidra imports/analyzes this binary once and batch_decompile reads
+          # all six known procedure entries in the same Program session.
+          npm install --prefix "$RUNNER_TEMP/rea-mcp-client" \
+            --no-audit --no-fund @modelcontextprotocol/client@2.3.1
+          cp scripts/rea-research-batch.mjs "$RUNNER_TEMP/rea-mcp-client/rea-research-batch.mjs"
+          node "$RUNNER_TEMP/rea-mcp-client/rea-research-batch.mjs" "$THIN_BINARY"
 
       - name: Upload REA research reports
         if: always()
