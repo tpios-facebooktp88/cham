@@ -293,3 +293,15 @@ The first P0 source changes following the audit are now committed to `main`. The
 - Searched the current source for other `.isRunning` dot-property accesses; none remain in the reviewed source files.
 - Build was not run. This source correction is not a claim that the full project now compiles; the user's next build result remains the acceptance check.
 - **Build-failure workflow:** when the user reports a build error, first fetch latest `main`, inspect the exact source and build configuration, locate the earliest concrete compiler error, make the smallest correction, record it here, and leave all build execution to the user unless explicitly authorized.
+
+
+## Follow-up build-error source audit — 2026-11-13
+
+The previous `.isRunning` correction was not the only Objective-C dot-syntax issue. A second source pass found three more invalid property-name accesses and one class-method dot expression:
+
+- `CHMOverlay.m`: `candidate.isKeyWindow` changed to `candidate.keyWindow`. UIKit declares the property as `keyWindow` with getter `isKeyWindow`.
+- `CHMTouchBackend.m`: `window.isKeyWindow` changed to `window.keyWindow` for the same reason.
+- `CHMTapScheduler.m`: `self.backend.isAvailable` changed to `self.backend.available`. The declared property is `available` with getter `isAvailable`.
+- `CHMTouchBackend.m`: `NSThread.isMainThread` changed to the explicit class-method call `[NSThread isMainThread]`.
+
+These are source-level compile-risk corrections found by scanning every current Objective-C/Objective-C++ source file for dot expressions beginning with `is`. The code was not compiled. The user still performs the build; if it fails again, the earliest compiler diagnostic is needed to distinguish any remaining SDK/toolchain issue from source errors.
