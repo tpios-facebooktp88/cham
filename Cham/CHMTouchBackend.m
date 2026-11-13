@@ -148,6 +148,12 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, NSError **er
     CHMAppendEvent(parent, finger, 0);
 
     CHMSetDigitizerInfo(parent, contextID, 0, 0, NULL, 0, 0);
+
+    UIApplication *application = UIApplication.sharedApplication;
+    SEL enqueueSelector = NSSelectorFromString(@"_enqueueHIDEvent:");
+    if ([application respondsToSelector:enqueueSelector]) {
+        ((void (*)(id, SEL, CHMIOHIDEventRef))objc_msgSend)(application, enqueueSelector, parent);
+    }
     CHMDispatchEvent(CHMEventClient, parent);
 
     CFRelease(finger);
