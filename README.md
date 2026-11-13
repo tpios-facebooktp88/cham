@@ -20,6 +20,8 @@ Standalone iOS automation tweak/dylib intended for TrollStore + TrollFools.
 - [x] Primary HID event provider source implementation (IOHID + BackBoardServices)
 - [x] UIApplication `_enqueueHIDEvent:` path
 - [x] UITouch and UIEvent state bridge source implementation
+- [x] Capture original DOWN window/view/context and reuse it for UP (source only)
+- [x] Stop scheduler on owning scene deactivation and expose unconfirmed release state (source only)
 - [ ] Device validation on iOS 16 (event delivery, DOWN/UP lifecycle and stop-time release)
 - [ ] Touch Recorder capture/replay
 - [ ] Vision capture loop, ROI and cooldown
