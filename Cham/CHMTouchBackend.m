@@ -132,15 +132,15 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
     }
 
     UIWindow *window = CHMActiveWindow();
-    SEL contextSelector = NSSelectorFromString(@"_contextId");
-    if (!window || ![window respondsToSelector:contextSelector]) {
-        CHMSetError(error, 6, @"The active application window does not expose a HID context ID.");
+    if (!window) {
+        CHMSetError(error, 6, @"No active application window is available.");
         return NO;
     }
-    uint32_t contextID = ((uint32_t (*)(id, SEL))objc_msgSend)(window, contextSelector);
-    if (contextID == 0) {
-        CHMSetError(error, 7, @"The active application window returned an invalid HID context ID.");
-        return NO;
+
+    uint32_t contextID = 0;
+    SEL contextSelector = NSSelectorFromString(@"_contextId");
+    if (CHMSetDigitizerInfo && [window respondsToSelector:contextSelector]) {
+        contextID = ((uint32_t (*)(id, SEL))objc_msgSend)(window, contextSelector);
     }
 
     const uint32_t eventMask = phase == CHMTouchPhaseDown ? 0x27 : 0x24;
@@ -243,7 +243,7 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
     [touchEvent _addTouch:touch forDelayedDelivery:NO];
     backend.activeTouch = touch;
 
-    if (CHMSetDigitizerInfo) {
+    if (CHMSetDigitizerInfo && contextID != 0) {
         CHMSetDigitizerInfo(parent, contextID, 0, 0, NULL, 0, 0);
     }
 
