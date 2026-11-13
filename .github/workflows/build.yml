@@ -23,7 +23,8 @@ jobs:
           xcodebuild -version
           bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
 
-      - name: Compile dylib only
+      - name: Compile versioned dylib
+        id: compile
         env:
           THEOS: ${{ runner.temp }}/theos
         run: |
@@ -36,15 +37,18 @@ jobs:
             exit 1
           fi
 
+          VERSION="$(printf '%02d' "$GITHUB_RUN_NUMBER")"
+          OUTPUT_NAME="Cham-${VERSION}.dylib"
           mkdir -p "${RUNNER_TEMP}/cham-output"
-          cp "$DYLIB_PATH" "${RUNNER_TEMP}/cham-output/Cham.dylib"
-          file "${RUNNER_TEMP}/cham-output/Cham.dylib"
-          xcrun lipo -info "${RUNNER_TEMP}/cham-output/Cham.dylib"
+          cp "$DYLIB_PATH" "${RUNNER_TEMP}/cham-output/${OUTPUT_NAME}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          file "${RUNNER_TEMP}/cham-output/${OUTPUT_NAME}"
+          xcrun lipo -info "${RUNNER_TEMP}/cham-output/${OUTPUT_NAME}"
 
-      - name: Upload dylib
+      - name: Upload versioned dylib
         uses: actions/upload-artifact@v4
         with:
-          name: Cham-dylib-${{ github.run_number }}
-          path: ${{ runner.temp }}/cham-output/Cham.dylib
+          name: Cham-${{ steps.compile.outputs.version }}
+          path: ${{ runner.temp }}/cham-output/Cham-${{ steps.compile.outputs.version }}.dylib
           if-no-files-found: error
           retention-days: 7
