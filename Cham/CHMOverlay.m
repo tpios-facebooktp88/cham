@@ -45,6 +45,7 @@
                     object:lifecycleObject
                      queue:NSOperationQueue.mainQueue
                 usingBlock:^(NSNotification *note) {
+        (void)note; // The observer only needs the notification timing.
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
         BOOL hadPendingTouch = self.scheduler.hasUnconfirmedTouch;
