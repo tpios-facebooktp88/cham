@@ -315,3 +315,13 @@ These are source-level compile-risk corrections found by scanning every current 
 - The failure was retrieved from the existing user-triggered Actions run; no new build or workflow run was started by the assistant.
 - Source fix commit: `08365142c2500ee73f5dd97a27d93e058ab0cb89`.
 - Build has not been rerun. The user remains responsible for the next build; do not mark compilation successful until a subsequent run succeeds.
+
+
+## START tap routing fix — 2026-11-13
+
+- User confirmed injection and overlay display work, but pressing START produced no visible target-app action.
+- Source inspection found a concrete hit-testing defect: the default tap point is the window center, while Cham's panel is placed over the central screen area. The backend only hid a point marker during hit-testing; it did not exclude Cham's own handle or panel. Thus the synthetic UITouch could be associated with Cham's overlay view rather than the underlying app content.
+- Marked the Cham handle and panel with the existing overlay tag (`0x43484D`). Point markers already use that tag.
+- During DOWN hit-testing, the backend now temporarily hides all tagged direct subviews of the host window, resolves the underlying app view, then restores each overlay's visibility. The rest of the HID dispatch path and scheduler timing are unchanged.
+- This is a source-level routing correction. It has not been compiled or device-validated; user must rebuild and test START on a clear target-app control. If it still does nothing, next investigation is the unresolved window-local versus HID screen-coordinate contract and runtime HID dispatch diagnostics.
+- Source commits: overlay `8b8b2e0ebf633022188ea9554d940d2109ceb8f7`; backend `8314410603b225f241746c59c8a71279efbb30ac`.
