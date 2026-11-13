@@ -1,4 +1,4 @@
-name: Build Cham AutoClicker
+name: Build Cham dylib
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Theos package (iOS)
+    name: Build Cham.dylib
     runs-on: macos-15
     steps:
       - name: Checkout
@@ -23,32 +23,28 @@ jobs:
           xcodebuild -version
           bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
 
-      - name: Build package
+      - name: Compile dylib only
         env:
           THEOS: ${{ runner.temp }}/theos
         run: |
           set -euo pipefail
-          make clean package FINALPACKAGE=1
-
-          OUTPUT_DIR="${RUNNER_TEMP}/cham-output"
-          mkdir -p "$OUTPUT_DIR"
-
-          find packages -maxdepth 1 -type f -name '*.deb' -exec cp {} "$OUTPUT_DIR/" \;
+          make clean all FINALPACKAGE=1
 
           DYLIB_PATH="$(find .theos -type f -name 'Cham.dylib' -print -quit)"
           if [ -z "$DYLIB_PATH" ]; then
             echo "Cham.dylib was not produced by Theos." >&2
             exit 1
           fi
-          cp "$DYLIB_PATH" "$OUTPUT_DIR/Cham.dylib"
 
-          echo "Build outputs:"
-          ls -lh "$OUTPUT_DIR"
+          mkdir -p "${RUNNER_TEMP}/cham-output"
+          cp "$DYLIB_PATH" "${RUNNER_TEMP}/cham-output/Cham.dylib"
+          file "${RUNNER_TEMP}/cham-output/Cham.dylib"
+          xcrun lipo -info "${RUNNER_TEMP}/cham-output/Cham.dylib"
 
-      - name: Upload build outputs
+      - name: Upload dylib
         uses: actions/upload-artifact@v4
         with:
-          name: Cham-AutoClicker-${{ github.run_number }}
-          path: ${{ runner.temp }}/cham-output/
+          name: Cham-dylib-${{ github.run_number }}
+          path: ${{ runner.temp }}/cham-output/Cham.dylib
           if-no-files-found: error
           retention-days: 7
