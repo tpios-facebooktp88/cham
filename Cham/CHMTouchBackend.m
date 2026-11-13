@@ -34,8 +34,8 @@ typedef struct __IOHIDEventSystemClient *CHMIOHIDEventSystemClientRef;
 
 @interface CHMTouchBackend ()
 @property (nonatomic, strong) UITouch *activeTouch;
-@property (nonatomic, weak) UIWindow *activeWindow;
-@property (nonatomic, weak) UIView *activeView;
+@property (nonatomic, strong) UIWindow *activeWindow;
+@property (nonatomic, strong) UIView *activeView;
 @property (nonatomic) uint32_t activeContextID;
 @property (nonatomic) CGPoint activePoint;
 @end
