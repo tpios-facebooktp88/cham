@@ -176,7 +176,15 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
     CHMAppendEvent(parent, finger, 0);
 
     UIApplication *application = UIApplication.sharedApplication;
-    UIView *hitView = [window hitTest:point withEvent:nil] ?: window.rootViewController.view;
+    UIView *hitView = [window hitTest:point withEvent:nil];
+    // Point markers are draggable UI, but must not become the target of the
+    // synthetic touch. Temporarily remove the marker from hit testing.
+    if (hitView.tag == 0x43484D) {
+        hitView.hidden = YES;
+        hitView = [window hitTest:point withEvent:nil];
+        hitView.superview.hidden = NO;
+    }
+    hitView = hitView ?: window.rootViewController.view;
     UITouch *touch = backend.activeTouch;
     if (!touch && phase == CHMTouchPhaseUp) {
         CFRelease(finger);
