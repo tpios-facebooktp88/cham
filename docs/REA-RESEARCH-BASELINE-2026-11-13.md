@@ -279,3 +279,144 @@ The user requested that the remaining research be consolidated and that Actions 
 - After this run, do not request another Actions execution for routine follow-up. Analyze the saved artifact and record any gaps as limitations. Only ask for another run if the final artifact is corrupt or the workflow itself fails, and explain why first.
 
 Scope of this final static pass: Touch/HID, known Tap modes and callbacks, Recorder/Replay string-reference discovery, and OCR/Vision string-reference discovery. A successful static pass does not establish device runtime behavior; runtime validation remains a separate evidence class and is not part of this Actions run.
+
+
+## REA run #5 — final consolidated static research pass
+
+- GitHub Actions run: [#5](https://github.com/tpios-facebooktp88/cham/actions/runs/43392892934)
+- Run ID: `43392892934`; job ID: `131776810201`
+- Analyzed commit: `6bce0a9e53c0534dd5d9a2d11e11b2db1c895e47`
+- Result: **success**; all 15 job steps succeeded.
+- Artifact: `Cham-REA-Research-5`, ID `14020929507`, 1,099,999 bytes; SHA-256 `b3bc3c2b89252217b260a42549284c0634d95fa619643667a463aa7b52d8083f`; expires 2027-02-11.
+- The artifact was downloaded and inspected. It contains the binary overview, environment, 13 feature trace JSON files, the consolidated decompilation result, REA tool catalog and final summary.
+- Original `Cham.dylib`: 472,048 bytes; SHA-256 again matched `bfeeced4b8d57d8f384fbe539fa2c575b98405172d4f32655ce79bd4ef1c4fdd`.
+- Temporary arm64 analysis slice: 226,288 bytes; SHA-256 `2fe3e601883f42ba5ff0975323fcaf6e042c6f5c17b1f5a9c53b637a978b414d`.
+- Toolchain: REA 6.9.0, Node v24.22.1, Temurin OpenJDK 25.0.5, Ghidra 12.2.
+- One persistent REA MCP/Ghidra session was used. Thirteen feature traces completed, followed by one consolidated `batch_decompile` request for 73 procedure entries. Result: **73 succeeded, 0 failed**.
+- This was static research only; no Theos, Codemagic or device build/runtime test was performed.
+
+### Feature discovery coverage
+
+| Query | Matched strings/procedures | References | New procedures collected | Notes |
+|---|---:|---:|---:|---|
+| `record` | 46 | 107 | 21 | Recorder UI/action handlers found |
+| `replay` | 2 | 2 | 0 | Only help/description strings in this trace |
+| `OCR` | 67 | 131 | 15 | Smart OCR settings, panel and ROI handlers |
+| `Vision` | 1 | 1 | 1 | Vision framework path referenced by `0xec04` |
+| `HUMAN` | 1 | 1 | 0 | Label string only |
+| `EXTREME` | 3 | 5 | 2 | Method `0xb8b0` resolved |
+| `ULTRA` | 3 | 5 | 1 | Method `0xb810` resolved |
+| `HOLD` | 8 | 11 | 1 | Hold duration setting handler `0x15bd0` |
+| `multiTouch` | 0 | 0 | 0 | No literal match for this query |
+| `fakeTouch` | 8 | 50 | 3 | Touch wrappers and selector references |
+| `normalTap` | 2 | 7 | 1 | Method `0xba18` resolved |
+| `doubleTap` | 2 | 5 | 0 | Method `0xbdc4` already known |
+| `smartTap` | 2 | 5 | 0 | Method `0xcecc` already known |
+
+All trace queries reported `truncated: false` and no residual unknowns in their normalized query results. This means the individual REA query outputs were not marked truncated; it does **not** prove global binary coverage. References whose source addresses were not inside a Ghidra procedure remain unresolved by those traces.
+
+### Touch/HID — new helper findings
+
+**`0xa9d8` — HID event construction helper**
+
+- Initializes its dynamic API bindings once through `dispatch_once`.
+- If the required HID API binding is unavailable, returns no event.
+- Uses `mach_absolute_time()` and the default CF allocator.
+- Calls dynamically resolved function pointers to create two related HID objects; applies additional event fields/attributes through other resolved function pointers, then links the objects.
+- Applies minimum force/radius-like numeric values of 0.01 where applicable; branches on the supplied phase-like parameter and sets different event type values (observed constants `0x24` / `0x27`).
+- The pseudocode does not expose the resolved symbol names or establish the semantic meaning of every numeric HID field. Do not infer undocumented constant meanings from the values alone.
+
+**`0xa28c` — alternate/system HID delivery helper**
+
+- Calls `0xa9d8` to construct the event.
+- Optionally obtains a context identifier from the touch and calls a dynamically resolved function with the event/context.
+- Checks whether UIApplication responds to private selector `_enqueueHIDEvent:`; if supported, invokes it.
+- Also uses a dynamically resolved enqueue/delivery function and releases the event.
+- Returns success only when the associated function pointer/context is available. This is a separate path from the main `sendEvent:` flow described under run #4.
+
+**`0xa464` — UITouch state population**
+
+- Hit-tests the supplied point in the target window; falls back to the root view/controller view when no hit view is found.
+- Dynamically checks and sets private UITouch properties/selectors for window, view, gesture view, tap count, phase, timestamp, location in window, first-touch-for-view and tap status.
+- Uses system uptime for the timestamp.
+- This confirms the touch object is populated with view/window/phase/location metadata before delivery; it does not prove every private setter exists or behaves identically on every iOS version.
+
+### Tap modes and scheduling
+
+**`0xc75c` — `ACPS_71d2c4::performTap`**
+
+The decompiled switch dispatches seven numeric modes:
+
+- Case 0: normal tap using the configured base duration.
+- Case 1: normal tap using `DAT_00031ae0`; the UI's `holdChanged:` handler stores the Hold slider value in this global and persists it. This links the Hold duration control to this path.
+- Case 2: randomized tap path. It offsets X and Y independently by an integer in the range -5 through +5 and scales the base duration by a factor from 0.80 through 1.20. The visible `HUMAN` label is present in the binary, but this trace does not directly prove the UI enum-to-case mapping; therefore, do not label case 2 as HUMAN with full certainty.
+- Case 3: double tap.
+- Case 4: sequence of configured points.
+- Case 5: ULTRA.
+- Case 6: EXTREME burst.
+
+Before dispatch, it checks enabled/busy state, stop state, eligibility and target window, then marks the tap operation busy and records a media-time timestamp. The mode-to-label mapping should still be checked against UI enum construction before implementation.
+
+**Sequence — `0xc444` / `0xc2b0`**
+
+- Copies the configured point sequence.
+- If empty, falls back to a normal tap at the default tap screen point.
+- Otherwise schedules each point on the main queue with `dispatch_after`.
+- The per-point interval is bounded by the configured duration plus 0.0001 seconds and the value returned by `0x8238`.
+- Callback `0xc490` performs each scheduled point; its full behavior is in the artifact pseudocode.
+
+**ULTRA — `0xb810`**
+
+- Enables the touch subsystem, gets the next configured point, performs an instant touch using the fake-touch `preferSystem:` path, and calls the fast-batch completion helper.
+- This method body performs one instant tap per invocation; any repeated cadence is controlled by its caller/scheduler, not a loop in this method.
+
+**EXTREME — `0xb8b0`**
+
+- Enables the touch subsystem and selects a burst count using the timing value from `0x8238`: 1, 2, 3 or 4 depending on observed timing thresholds (0.003, 0.008 and 0.02 seconds).
+- Caps the burst by the remaining configured tap count when a limit exists.
+- Repeatedly obtains the next tap point and calls the instant-tap path while eligibility, enabled state and tap-count conditions remain satisfied.
+- Calls the fast-batch completion helper with the prior count.
+
+**Completion callbacks**
+
+- `0xbbec` adds independent random X/Y offsets from -1.0 to +1.0 points to the intermediate touch position and sends phase value 1.
+- `0xbc90` sends terminal phase value 3, disables the touch subsystem, clears the busy state, updates count/state and stops when the configured count is reached.
+- `0xbf34` sends a terminal phase, then schedules `0xc02c` after a stored delay.
+- `0xc02c` sends a new begin phase (value 0); on success schedules `0xc18c`. The callback chain continues the double-tap sequence and releases state on failure/completion.
+- `0xd028` sends terminal phase value 3, increments the count, disables the touch subsystem, clears busy state and updates the UI state.
+- Phase numbers above are the literal values passed by the decompiled code. Their UIKit enum interpretation is consistent with the observed flow but should be runtime-validated on target iOS.
+
+### Recorder — what is established and what remains open
+
+The binary contains a dedicated Recorder panel and handlers:
+
+- Persistent setting keys include `recorderSpeed`, `recorderLoops`, and `recorderEventFile`; the named file is `acp_recording.bin`.
+- UI strings describe recording touches/swipes and replaying them.
+- Decompiled handlers include record, stop, play, clear, speed, loop, floating stop button and panel open/close.
+- `recorderRecordFromMenu` calls internal routines at `0xe0c0` and `0x119d8`, then hides the main menu and shows a floating stop button.
+- `recorderStopFromMenu` calls `0x11854` and `0x11b4c`, hides the floating stop button and reopens the Recorder panel.
+- `recorderPlayFromMenu` calls `0xe0c0` and `0x124b4`.
+- `recorderClearFromMenu` calls `0x12b04`.
+- Speed is clamped to the observed range 0.25–100.0 and persisted.
+- Loop control uses 0 for no repeat, finite positive values, and 51 as a special sentinel value in the handler. Its exact user-facing meaning should be confirmed in the playback core.
+
+**Important limitation:** the internal Recorder core routines above were identified as direct calls but were not included in the 73-address decompile batch. The artifact therefore proves the UI wiring, setting names, file name and call targets, but does not yet establish the binary event schema, how touches are captured, exact persistence/write behavior, replay timing/scaling, loop termination or cleanup. Do not implement the Recorder from UI strings alone.
+
+### OCR/Vision — what is established and what remains open
+
+- Smart OCR settings include `smartOCRText`, `smartOCRInterval`, `smartOCRCooldown`, `smartOCRMatchMode`, and ROI preferences `smartOCRROIX/Y/W/H` plus `smartOCRROIEnabled`.
+- Decompiled methods cover Smart OCR panel construction/open/close, text and match-mode controls, cooldown control, enable toggle, ROI preference save/load/reset, ROI editor display/hide, overlay update and drag/pan handlers.
+- The Vision framework path `/System/Library/Frameworks/Vision.framework/Vision` is referenced by `0xec04`, whose decompiled body calls `dlopen` on that path.
+- The default ROI reset routine constructs a centered rectangle with 60% of screen width and 30% of screen height. ROI editing enforces a minimum observed width/height of 40 points.
+- The OCR trace did not resolve a decompiled Vision request/recognition/matching engine. The 73-function batch includes extensive OCR UI/ROI code, not proof of the full OCR processing pipeline, text matching algorithm, scan interval execution or result-to-touch dispatch.
+
+### Final assessment and next engineering gate
+
+- **Touch/HID construction and dispatch:** strong static evidence for the UITouch + HID event paths; no device runtime proof.
+- **POINT / DOUBLE / Hold-duration path / sequence / ULTRA / EXTREME:** entry points and major scheduling logic decompiled; HUMAN label-to-case mapping remains unproven.
+- **Recorder:** UI and settings are understood at a high level; capture/storage/replay core remains open.
+- **OCR:** Smart OCR controls and ROI management are understood; recognition and matching core remains open.
+- **Multi-touch:** no literal `multiTouch` match in the final trace. The fake-touch APIs accept a touch identifier and maintain a dictionary of touch objects, but this alone does not prove the complete multi-point feature behavior.
+- **Runtime validation:** not performed. Static decompilation cannot prove successful injection, HID acceptance, touch delivery, Recorder fidelity or Vision behavior on iOS 16.
+
+This is the final planned Actions run. Use the downloaded `Cham-REA-Research-5` artifact and this report for further static review and implementation planning; do not schedule additional Actions runs for ordinary follow-up. If an engineering decision depends on one of the explicitly open core routines, first assess whether it can be answered from the existing artifact/repository before requesting any new execution.
