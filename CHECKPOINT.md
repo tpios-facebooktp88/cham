@@ -68,7 +68,7 @@ Treat symbol names and wrapper behavior as research leads. Verify exact symbol a
 
 ## Current repository facts checked on 2026-11-13
 
-Latest `main` commit: `54c2f0cd1b1208945c1f42bb2ce9965969e0a68e`.
+Latest `main` commit at checkpoint refresh: `8326a808df25e835f72f2a61814359e167619aa2`.
 
 Current source tree includes:
 - `Cham/CHMOverlay.h`, `Cham/CHMOverlay.m`
@@ -112,6 +112,8 @@ Correction made from this comparison:
 - Source change commit: `951b894170d230b3b0ec12115e3bc679a5009c46`.
 - UITouch lifecycle correction: the backend now retains `activeTouch` for the DOWN phase and clears its strong reference after dispatching UP. A new tap therefore creates a fresh `UITouch` instead of reusing the previous completed tap's object. If UP preparation fails before dispatch, the prior active touch remains available for diagnosis/recovery.
 - Source change commit: `6273e204073a3e2b6e53064bdb92c9906d2a61d5`.
+- Scheduler release-failure correction: `stop` now clears `touchIsDown` only when the backend confirms UP; otherwise it retains the blocked state and reports an error. `start` retries stop and refuses to begin a new DOWN while a previous touch remains unconfirmed. The UP-failure path no longer clears the state before stop attempts release.
+- Source change commit: `8326a808df25e835f72f2a61814359e167619aa2`.
 
 Still requiring audit:
 - Full UITouch/UIEvent phase and reuse lifecycle, including cleanup after UP and stop.
