@@ -46,7 +46,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-          cache: maven
 
       - name: Download and verify Ghidra 12.2
         shell: bash
