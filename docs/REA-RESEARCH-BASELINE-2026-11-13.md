@@ -134,3 +134,50 @@ Static pseudocode is not proof of successful touch delivery. Any device-level co
 ## Acceptance criteria
 
 A phase is complete only when its output has been retrieved, inspected, and recorded here. A successful workflow run alone does not mean the methods have been reconstructed. Do not mark Tap/HID reverse engineering complete until method IMPs, decompilation, and a defensible call graph are available.
+
+
+## Successful run #3 — selector cross-references and trace
+
+- GitHub Actions run: [#3](https://github.com/tpios-facebooktp88/cham/actions/runs/43387946159)
+- Analyzed commit: `58ee892a312160944ce1cfe4f6cc17719fc9480d`
+- Result: **success**; elapsed approximately 12 minutes 29 seconds.
+- Artifact: `Cham-REA-Research-3`, 45,737 bytes, retained until 2027-02-11.
+- Artifact SHA-256: `b231032b5bd84bca65efcc7a7929f25fe585707ab99aafcb63759615ee15c670`.
+- Original-binary hash verification and Ghidra setup passed again. All stderr logs in this run were empty.
+
+### New reference evidence
+
+The REA trace resolved references from selector strings to containing Ghidra procedures. The following procedure entries were directly reported in the trace output:
+
+| Procedure entry | Procedure name | Evidence / role |
+|---|---|---|
+| `0x9a5c` | `ACPT_8c93f1::fakeTouchId:AtScreenPoint:inWindow:withTouchPhase:` | Fake-touch screen-point wrapper |
+| `0x9a74` | `ACPT_8c93f1::fakeTouchId:AtScreenPoint:inWindow:withTouchPhase:preferSystem:` | Fake-touch variant with preferSystem |
+| `0x9a8c` | `ACPT_8c93f1::fakeTouchId:AtScreenPoint:inWindow:withTouchPhase:force:radius:` | Fake-touch variant with force/radius |
+| `0xba18` | `ACPS_71d2c4::_normalTapAt:inWindow:duration:` | Normal tap implementation |
+| `0xbdc4` | `ACPS_71d2c4::_doubleTapAt:inWindow:` | Double tap implementation |
+| `0xcecc` | `ACPS_71d2c4::smartTapAtScreenPoint:` | Smart tap implementation |
+
+These are Ghidra function/procedure entries reported by the containing-procedure evidence for references to the selector strings. They are substantially stronger than selector-string addresses. However, their method ownership and runtime semantics should still be checked against the decompiled body and Objective-C metadata before treating every label as a fully proven method implementation.
+
+### Additional xref observations
+
+- Selector string `0x297f3` (base fake-touch selector) had references from procedures including `0xba18` (normal tap), `0xbdc4` (double tap), and `0xcecc` (smart tap), plus several additional procedures at `0xbbec`, `0xbc90`, `0xbf34`, `0xc02c`, `0xc18c`, `0xc490`, `0xc628`, and `0xd028`.
+- Selector string `0x28baf` (preferSystem variant) was referenced from `0xb608`, named `ACPS_71d2c4::_instantTapAt:inWindow:preferSystem:`.
+- Selector string `0x28e07` (normal tap) had references from procedures `0xc444` and `0xc944`, in addition to metadata reference `0x30d40`.
+- Selector string `0x28ae1` (double tap) had references from `0xc96c` and metadata reference `0x30d20`.
+- Selector string `0x28b08` (extreme burst) had references from `0xc99c` and metadata reference `0x30d28`.
+- Selector string `0x291ad` (ultra tap) had references from `0xc990` and metadata reference `0x30d50`.
+- Smart tap selector string `0x2a575` was referenced from `0x104b0`, contained in procedure `0x1044c` (`FUN_0001044c`); the trace also identifies `0xcecc` as the smartTap method symbol/procedure.
+- Both trace outputs reported `truncated: false` and no residual unknowns in their normalized result. This does not guarantee global reference completeness; REA explicitly limits each query to the matched start addresses and reports that empty/truncated-false output alone is not proof of complete coverage.
+
+### Next phase prepared
+
+The research workflow has now been updated on `main` at commit `05d14158e9aaf5a7484a046fe19b8e6fdbbf8245`. The next manual run adds REA function dossiers and pseudocode decompilation for these six key procedure entries:
+
+- `0x9a5c`, `0x9a74`, `0x9a8c` — fake-touch wrappers
+- `0xba18` — normal tap
+- `0xbdc4` — double tap
+- `0xcecc` — smart tap
+
+This next run has **not yet been dispatched**. It will produce one function dossier and one decompilation JSON per address. Do not start Theos/Codemagic build workflows during this analysis.
