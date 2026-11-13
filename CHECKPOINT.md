@@ -69,12 +69,13 @@ Settings are saved during edits and layout changes and restored when the overlay
 - Known-good backend file: `Cham/CHMTouchBackend.m`.
 - Blob SHA: `51fd6a2ad99d57a1f896b8c4c32dad0666a9fd29`.
 - Original uploaded `Cham.dylib` remains untouched and is not a build input.
-- Preserve the IOKit digitizer function-pointer ABI, event metadata, UIKit `sendEvent:` path, same-window/view DOWN→UP pairing, and failure blocking.
+- Preserve the IOKit digitizer function-pointer ABI, event metadata, UIKit `sendEvent:` path, matching retained UITouch/window/view/context for DOWN→UP, and failure blocking. The original target view may detach during an app transition; do not reject its matching UP solely because `hitView.window` becomes nil or changes. Do not re-hit-test or substitute a new view for UP.
 - Never claim success when the backend cannot confirm dispatch.
 - Do not modify this backend without concrete device evidence and explicit need.
 
 ## Recent relevant commits
 
+- `7715ad91ad4303e92b187c9cc64b6f8c565c2f72`: allow the matching UP to dispatch when the original target view has detached, while retaining the original active touch/window/view/context.
 - `11a42068fdb2a08070ffffacfed260e44c986173`: fix NSValue CGPoint read in scheduler using `getValue:`.
 - `633a5161f51af632807c3e08b5dd803d344d39a7`: record compile fix and validation state.
 - `1c38ee2239fd021b4e68981cb53d289b6edad75a`: remove purple top accent; clarify interval label; add numeric press-duration entry.
