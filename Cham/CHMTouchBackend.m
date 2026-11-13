@@ -180,9 +180,10 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
     // Point markers are draggable UI, but must not become the target of the
     // synthetic touch. Temporarily remove the marker from hit testing.
     if (hitView.tag == 0x43484D) {
-        hitView.hidden = YES;
+        UIView *marker = hitView;
+        marker.hidden = YES;
         hitView = [window hitTest:point withEvent:nil];
-        hitView.superview.hidden = NO;
+        marker.hidden = NO;
     }
     hitView = hitView ?: window.rootViewController.view;
     UITouch *touch = backend.activeTouch;
