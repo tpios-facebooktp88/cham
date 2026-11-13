@@ -2,6 +2,9 @@
 
 Standalone iOS automation tweak/dylib intended for TrollStore + TrollFools.
 
+## Project checkpoint
+- Technical research, verified source status, audit items, and implementation sequence: [CHECKPOINT.md](CHECKPOINT.md).
+
 ## Agreed scope
 - Tap Mode: POINT, DOUBLE, HOLD, HUMAN, EXTREME, ULTRA and multi-point.
 - Touch Recorder: record, save, replay, speed multiplier, loop, stop and clear.
