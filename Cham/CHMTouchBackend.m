@@ -168,7 +168,8 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
         }
     }
 
-    const uint32_t eventMask = phase == CHMTouchPhaseDown ? 0x27 : 0x24;
+    // The reference helper maps Began (0) and Ended (3) to HID mask 0x27.
+    const uint32_t eventMask = 0x27;
     const uint64_t senderID = 0xDEFACEDBEEFFECE5ULL;
     const double force = 0.5;
     const double radius = 0.04;
@@ -262,9 +263,9 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
     if ([touch respondsToSelector:@selector(setGestureView:)]) [touch setGestureView:hitView];
     [touch setTapCount:1];
     // Cham keeps the UITouch in Stationary; the HID event carries DOWN/UP.
-    [touch setPhase:UITouchPhaseStationary];
+    [touch setPhase:isDown ? UITouchPhaseBegan : UITouchPhaseEnded];
     [touch setTimestamp:eventTime];
-    [touch _setLocationInWindow:point resetPrevious:NO];
+    [touch _setLocationInWindow:point resetPrevious:isDown];
     [touch _setIsFirstTouchForView:YES];
     if ([touch respondsToSelector:@selector(setIsTap:)]) [touch setIsTap:YES];
     [touch _setHidEvent:parent];
