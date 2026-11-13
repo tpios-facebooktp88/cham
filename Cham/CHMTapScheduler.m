@@ -103,7 +103,9 @@
 
     if (!self.touchIsDown) {
         if (self.pointIndex >= self.points.count) self.pointIndex = 0;
-        self.activePoint = self.points[self.pointIndex].CGPointValue;
+        CGPoint point;
+        [self.points[self.pointIndex] getValue:&point];
+        self.activePoint = point;
 
         NSError *error = nil;
         if (![self.backend dispatchPoint:self.activePoint phase:CHMTouchPhaseDown error:&error]) {
