@@ -70,7 +70,7 @@ try {
   await call(
     "batch_decompile",
     {
-      addresses: ["0x9a5c", "0x9a74", "0x9a8c", "0xba18", "0xbdc4", "0xcecc"],
+      addresses: ["0xa28c", "0xa464", "0xa9d8", "0xbbec", "0xbc90", "0xbf34", "0xd028", "0x9698", "0x93b8", "0x8238", "0x5f30"],
       detail: "complete",
     },
     1_500_000,
@@ -80,7 +80,8 @@ try {
     target: binaryPath,
     provider: "ghidra",
     workflow: "one persistent REA MCP session; one batch_decompile call",
-    addresses: ["0x9a5c", "0x9a74", "0x9a8c", "0xba18", "0xbdc4", "0xcecc"],
+    phase: "Touch/HID helpers and tap completion callbacks",
+    addresses: ["0xa28c", "0xa464", "0xa9d8", "0xbbec", "0xbc90", "0xbf34", "0xd028", "0x9698", "0x93b8", "0x8238", "0x5f30"],
     completed_at: new Date().toISOString(),
   });
 } finally {
