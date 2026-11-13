@@ -108,6 +108,8 @@ Verified from Objective-C metadata and arm64 call-site disassembly:
 Correction made from this comparison:
 - The first reimplementation incorrectly treated BackBoardServices and `BKSHIDEventSetDigitizerInfo` as mandatory. The original loader continues when BackBoardServices cannot be opened; the metadata call is conditional on the function and a valid context ID. `CHMTouchBackend.m` now keeps both optional.
 - Source change commits: `7f49737224f309134d45ea7bf3177060733ef2b4` (optional symbol) and `02c2c98f82dc036a6deee9d45b382224908548ba` (optional framework).
+- Follow-up source audit found that the reimplementation still rejected a window without `_contextId`, even though BackBoardServices had become optional. The original path only applies BackBoard digitizer metadata when the function and a nonzero context are available. The backend now requires an active window, but obtains context ID opportunistically and calls the metadata function only when both are available.
+- Source change commit: `951b894170d230b3b0ec12115e3bc679a5009c46`.
 
 Still requiring audit:
 - Full UITouch/UIEvent phase and reuse lifecycle, including cleanup after UP and stop.
