@@ -24,7 +24,7 @@ Standalone iOS automation tweak/dylib intended for TrollStore + TrollFools.
 Checked items are source-code milestones, not device-tested claims. The HID and UIKit touch bridge source has not been built or validated on a device.
 
 ## Build
-Requires Theos and an iOS SDK. Run make package in a configured Theos environment. No CI workflow is enabled.
+GitHub Actions builds the Theos package on pushes to `main` and on manual dispatch. Download the `Cham-AutoClicker-*` artifact from the workflow run to get the `.deb` package and `Cham.dylib`. The workflow installs Theos and its iOS SDK on a macOS runner; it does not install or test the tweak on a device.
 
 ## Compatibility
 The current provider dynamically resolves the HID and BackBoardServices entry points, constructs a parent Digitizer event and a finger event, applies the active window context ID, and dispatches through the HID event-system client. The provider also queues the event through UIApplication's `_enqueueHIDEvent:` selector. The provider also updates the shared UITouch/UIEvent state using the private UIKit selectors found in the reference binary. The scheduler's phase contract is DOWN = 0 and UP = 1. API availability and a dispatch call do not prove that iOS accepted or delivered the touch; device validation is still required. The original Cham.dylib is not modified, linked, or required.
