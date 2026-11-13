@@ -169,16 +169,12 @@
     CGPoint point = CGPointMake(self.xField.text.doubleValue, self.yField.text.doubleValue);
     [self.points addObject:[NSValue valueWithCGPoint:point]];
     self.pointsLabel.text = [NSString stringWithFormat:@"Points: %lu · Multi-point sequence", (unsigned long)self.points.count];
-    [self.viewForKeyboard endEditing:YES];
+    [self.panel endEditing:YES];
 }
 
 - (void)clearPoints {
     [self.points removeAllObjects];
     self.pointsLabel.text = @"Points: 0 · X/Y will be used at START";
-}
-
-- (UIView *)viewForKeyboard {
-    return self.panel;
 }
 
 - (void)startTapping {
