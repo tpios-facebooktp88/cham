@@ -500,6 +500,9 @@ The user confirmed that only POINT mode is currently needed. Other Tap modes and
 - Scheduler header: `95da3549707e27853a87f339c9419ef1978ad1c0`
 - Scheduler implementation: `ab06cf968ae8fa2c506064f5608919ce57efd108`
 - Overlay redesign and persistence: `1d5385225a6052dba47610a0abb3aaa34efce9f3`
+- Preserve existing defaults before the panel is first opened: `276e0d3e5b58b397c46f2f94365b3a884d2e7392`
+- Remove unused UIKit scheduler import: `4f0b7e125b1fcc7bdaf15a44ba297ca83679450d`
+- Adjust press-duration value label spacing: `04873c5bc090116bce4ba14002e8b96b93119ca7`
 - Preserve pre-panel settings defaults: `276e0d3e5b58b397c46f2f94365b3a884d2e7392`
 - Makefile OCR removal: `b4b79feda2936067bb1d5324fd007b68a63f7d74`
 - README scope update: `5d0e831e89192deeb3bf02f255e3eab8b59704c9`
