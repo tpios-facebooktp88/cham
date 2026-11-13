@@ -398,3 +398,35 @@ Commits:
 - No build or device test was run. User must compile and test a tap on a clear target-app control.
 - A successful dispatch call still does not prove that iOS delivered the touch to the target app.
 - The backend currently supports only DOWN and terminal UP; the reference's optional intermediate HUMAN move phase (1) is not yet implemented.
+
+
+## HID constructor ABI and coordinate correction — 2026-11-13
+
+User reported that the injected tweak and overlay still did not produce a target-app touch. Re-opened the saved final REA #5 pseudocode and compared the exact dynamic function-pointer call argument order with `CHMTouchBackend.m`.
+
+### Confirmed mismatches
+
+- REA `0xa9d8` calls the digitizer constructor with the five scalar values first (`x, y, z, force, twist`), followed by allocator, mach timestamp, transducer/index/identity, event mask, button mask, and range/touch flags. The previous source typedef and call used allocator/time/metadata first. The ABI argument order did not match the recovered call site.
+- REA calls the finger constructor in the same scalar-first order, followed by allocator/time, finger index/identity, event mask, range/touch flags, and options. The previous source also used a different order.
+- REA `0xa28c` invokes the BackBoard digitizer metadata function as `(0, 0, event, windowContextID, 0, 0, 0)`. The previous source passed `(event, contextID, 0, 0, NULL, 0, 0)`, which did not match the recovered call order.
+- The overlay stores points in host-window coordinates. The original fake-touch path explicitly converts between screen and window coordinate spaces. The previous source sent the same window-local point to both HID and UITouch.
+
+### Source correction on main
+
+- Corrected both dynamic constructor function-pointer typedefs and their call argument order to match the saved REA pseudocode.
+- Corrected the BackBoard metadata function signature and call order.
+- Converted the stored window-local point to screen coordinates for HID event creation; UIKit `UITouch` continues to receive the window-local point.
+- Set digitizer range/touch flags to 1 on DOWN and 0 on terminal UP, matching the recovered phase-derived boolean for phases 0 and 3.
+- Kept the recovered event mask `0x27`, sender ID, parent/finger field IDs, force and radius values, event append, UIApplication enqueue, and event-system-client dispatch.
+
+Source commit: `b1e93c314cd70407a30488b5514e4f9d2d25835b`.
+
+### Static verification
+
+Re-fetched the committed source from GitHub and verified all eight expected ABI, metadata, coordinate, and phase-flag patterns. No build, Actions run, injection, or device test was performed.
+
+### Remaining validation
+
+- The exact ABI order is supported by the saved decompiled call site, but must still be validated by compiling and testing on the target iOS 16 environment.
+- `IOHIDEventSystemClientDispatchEvent` and UIApplication's private enqueue method do not provide an application-level delivery acknowledgement. A successful return from the local backend is not proof that the target app received the touch.
+- If the corrected build still does not touch, the next required evidence is the in-app diagnostic output for each stage: symbol resolution, parent event creation, finger event creation, window-to-screen coordinates, context ID/BKS metadata availability, UIKit enqueue selector availability, and dispatch invocation. Do not add another HID API blindly.
