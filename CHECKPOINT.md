@@ -1,6 +1,6 @@
 # Cham AutoClicker — Engineering Checkpoint
 
-Updated: 2026-11-13
+Updated: 2026-11-13 — Shopee/Lazada device validation
 Repository: `tpios-facebooktp88/cham`
 Active branch: `main` only
 
@@ -12,7 +12,8 @@ A small POINT-only iOS auto-clicker tweak. The user wants the simplest useful to
 
 - User reports the latest build after fixing the scheduler compile error succeeded.
 - User reports the floating tool opens and saved settings persist.
-- User previously confirmed that POINT touch delivery generated a real click on-device.
+- User confirmed POINT tapping runs smoothly in Lazada.
+- After the detached-view UP fix, user confirmed tapping also runs smoothly in Shopee and continues beyond the first tap.
 - The user observed a thin purple horizontal bar at the top of the panel; removed in commit `1c38ee2239fd021b4e68981cb53d289b6edad75a`.
 - The user requested precise numeric entry for press duration because slider-only adjustment was too coarse. A numeric millisecond field was added beside/below the slider in the same commit.
 - The latest UI/documentation edits have not yet been rebuilt or visually verified on-device.
@@ -67,9 +68,10 @@ Settings are saved during edits and layout changes and restored when the overlay
 ## Verified touch backend — preserve
 
 - Known-good backend file: `Cham/CHMTouchBackend.m`.
-- Blob SHA: `51fd6a2ad99d57a1f896b8c4c32dad0666a9fd29`.
+- Current backend blob SHA after the Shopee fix: `b6cad179c2bef740780f19e762aa59e948878f86`.
 - Original uploaded `Cham.dylib` remains untouched and is not a build input.
 - Preserve the IOKit digitizer function-pointer ABI, event metadata, UIKit `sendEvent:` path, matching retained UITouch/window/view/context for DOWN→UP, and failure blocking. The original target view may detach during an app transition; do not reject its matching UP solely because `hitView.window` becomes nil or changes. Do not re-hit-test or substitute a new view for UP.
+- Device validation: user reports smooth continuous POINT tapping in both Lazada and Shopee after commit `7715ad91ad4303e92b187c9cc64b6f8c565c2f72`.
 - Never claim success when the backend cannot confirm dispatch.
 - Do not modify this backend without concrete device evidence and explicit need.
 
@@ -90,7 +92,7 @@ The completed REA workflow, runner script, and research report were removed from
 
 - The compile error from Actions run `43418856210` was `NSValue *` missing `CGPointValue` at `CHMTapScheduler.m:105`; fixed with `getValue:`.
 - User subsequently confirmed that the build succeeded.
-- The current panel refinements and documentation commits were re-fetched from `main`, but have not been built or device-tested yet.
+- User's latest device report confirms smooth continuous tapping in Lazada and Shopee after the detached-view UP fix. This is device validation reported by the user; do not generalize it to every app or iOS version.
 - A successful build does not by itself verify tap timing, touch injection, or visual layout; distinguish compile status from on-device behavior.
 
 ## Mandatory workflow rules
