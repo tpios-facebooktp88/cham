@@ -439,3 +439,12 @@ Re-fetched the committed source from GitHub and verified all eight expected ABI,
 - The REA baseline explicitly records that the original UIKit path iterates tracked touches, adds them to the event, and calls `UIApplication.sendEvent:`. Added the missing `[application sendEvent:touchEvent]` immediately after `_addTouch:forDelayedDelivery:`.
 - No timing code, mode behavior, original `Cham.dylib`, or Makefile framework list was changed. The Makefile currently links UIKit and Foundation; IOKit symbols are dynamically resolved with `dlopen/dlsym`, so adding `-framework IOKit` is not required by this implementation.
 - This is an evidence-based source correction, not proof of OS-level touch delivery. The coexistence/branch relationship between the UIKit send path and alternate HID dispatch path still needs iOS 16 device validation. No build, Actions run, or injection test was performed.
+
+
+## IOKit HID constructor ABI correction — 2026-11-13
+
+- Re-fetched the current `main` source before editing. The two dynamically resolved constructor typedefs/calls in `Cham/CHMTouchBackend.m` did not match the exported IOKit function signatures: the source passed coordinate/pressure scalars before allocator, timestamp and digitizer metadata.
+- Corrected `IOHIDEventCreateDigitizerEvent` to the 15-argument ABI: allocator, timestamp, transducer type, index, identity, event mask, button mask, x/y/z, tip pressure, barrel pressure, range, touch, options.
+- Corrected `IOHIDEventCreateDigitizerFingerEvent` to the 13-argument ABI: allocator, timestamp, index, identity, event mask, x/y/z, tip pressure, twist, range, touch, options.
+- Kept the existing intended values (parent transducer type 3; finger index/identity 1; event mask 0x27; existing coordinates, force, range/touch flags). No scheduler timing, overlay, framework list, or original `Cham.dylib` changes.
+- ABI signatures cross-checked against the public IOKit header and WebKit's iOS HID event generator. Static source correction only; no build or iOS 16 runtime test was run. This does not yet prove event delivery.
