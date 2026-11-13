@@ -34,6 +34,10 @@ typedef struct __IOHIDEventSystemClient *CHMIOHIDEventSystemClientRef;
 
 @interface CHMTouchBackend ()
 @property (nonatomic, strong) UITouch *activeTouch;
+@property (nonatomic, weak) UIWindow *activeWindow;
+@property (nonatomic, weak) UIView *activeView;
+@property (nonatomic) uint32_t activeContextID;
+@property (nonatomic) CGPoint activePoint;
 @end
 
 typedef CHMIOHIDEventRef (*CHMCreateDigitizerEventFn)(
@@ -131,16 +135,37 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
         return NO;
     }
 
-    UIWindow *window = CHMActiveWindow();
-    if (!window) {
-        CHMSetError(error, 6, @"No active application window is available.");
-        return NO;
-    }
-
+    BOOL isDown = phase == CHMTouchPhaseDown;
+    UIWindow *window = nil;
+    UIView *hitView = nil;
     uint32_t contextID = 0;
-    SEL contextSelector = NSSelectorFromString(@"_contextId");
-    if (CHMSetDigitizerInfo && [window respondsToSelector:contextSelector]) {
-        contextID = ((uint32_t (*)(id, SEL))objc_msgSend)(window, contextSelector);
+
+    if (isDown) {
+        // Never begin a second contact while the previous UITouch is retained.
+        if (backend.activeTouch) {
+            CHMSetError(error, 15, @"A previous touch is still active; refusing a second DOWN.");
+            return NO;
+        }
+        window = CHMActiveWindow();
+        if (!window) {
+            CHMSetError(error, 6, @"No active application window is available.");
+            return NO;
+        }
+        SEL contextSelector = NSSelectorFromString(@"_contextId");
+        if (CHMSetDigitizerInfo && [window respondsToSelector:contextSelector]) {
+            contextID = ((uint32_t (*)(id, SEL))objc_msgSend)(window, contextSelector);
+        }
+    } else {
+        // UP must close the same contact in the same window/view/context.
+        // Do not select a new key window or re-hit-test a potentially different view.
+        window = backend.activeWindow;
+        hitView = backend.activeView;
+        contextID = backend.activeContextID;
+        point = backend.activePoint;
+        if (!backend.activeTouch || !window || !hitView || hitView.window != window) {
+            CHMSetError(error, 16, @"The original touch window or view is no longer valid; UP was not dispatched.");
+            return NO;
+        }
     }
 
     const uint32_t eventMask = phase == CHMTouchPhaseDown ? 0x27 : 0x24;
@@ -180,16 +205,18 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
     CHMAppendEvent(parent, finger, 0);
 
     UIApplication *application = UIApplication.sharedApplication;
-    UIView *hitView = [window hitTest:point withEvent:nil];
-    // Hit testing returns the marker's child label, so walk up to its root.
-    UIView *marker = hitView;
-    while (marker && marker.tag != 0x43484D) marker = marker.superview;
-    if (marker) {
-        marker.hidden = YES;
+    if (isDown) {
         hitView = [window hitTest:point withEvent:nil];
-        marker.hidden = NO;
+        // Hit testing returns the marker's child label, so walk up to its root.
+        UIView *marker = hitView;
+        while (marker && marker.tag != 0x43484D) marker = marker.superview;
+        if (marker) {
+            marker.hidden = YES;
+            hitView = [window hitTest:point withEvent:nil];
+            marker.hidden = NO;
+        }
+        hitView = hitView ?: window.rootViewController.view;
     }
-    hitView = hitView ?: window.rootViewController.view;
     UITouch *touch = backend.activeTouch;
     if (!touch && phase == CHMTouchPhaseUp) {
         CFRelease(finger);
@@ -252,9 +279,20 @@ static BOOL CHMDispatchHIDTouch(CGPoint point, CHMTouchPhase phase, CHMTouchBack
     }
     CHMDispatchEvent(CHMEventClient, parent);
 
-    // A UITouch belongs to one DOWN/UP sequence. Retain it while DOWN is
-    // active, then release the backend's reference after the UP event is sent.
-    backend.activeTouch = phase == CHMTouchPhaseDown ? touch : nil;
+    // Keep the original target context until the matching UP dispatch path.
+    if (isDown) {
+        backend.activeTouch = touch;
+        backend.activeWindow = window;
+        backend.activeView = hitView;
+        backend.activeContextID = contextID;
+        backend.activePoint = point;
+    } else {
+        backend.activeTouch = nil;
+        backend.activeWindow = nil;
+        backend.activeView = nil;
+        backend.activeContextID = 0;
+        backend.activePoint = CGPointZero;
+    }
 
     CFRelease(finger);
     CFRelease(parent);
