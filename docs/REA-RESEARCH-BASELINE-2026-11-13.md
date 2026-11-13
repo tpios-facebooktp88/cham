@@ -242,3 +242,21 @@ These observations establish use of UIKit `UITouch` plus dynamically resolved pr
 
 Decompile the helper/callback procedures in one REA MCP batch, using addresses grounded by the current pseudocode and earlier trace:
 `0x0a28c`, `0x0a464`, `0x0a9d8`, `0xbbec`, `0xbc90`, `0xbf34`, `0xd028`, plus `0x09698`, `0x093b8`, `0x08238`, `0x05f30` if confirmed as procedure entries by REA's resolver. Focus first on touch phase transitions, HID event construction, and release/cleanup callbacks. Do not infer runtime behavior without device testing.
+
+
+## Next batch prepared — Touch/HID helpers and completion callbacks
+
+- Script update commit: `7001975b5c74b9821a3657ae6af33e9026a43243`
+- Branch: `main`
+- The persistent MCP runner now submits these 11 candidate procedure entries in one `batch_decompile` request:
+  - `0xa28c` — alternate/system-touch path called by the core fake-touch routine.
+  - `0xa464` — touch-state update helper.
+  - `0xa9d8` — HID-event construction/creation helper.
+  - `0xbbec`, `0xbc90` — normal-tap delayed callbacks.
+  - `0xbf34` — double-tap delayed callback.
+  - `0xd028` — smart-tap delayed callback.
+  - `0x9698`, `0x93b8` — core routine's touch/window-related helper calls.
+  - `0x8238` — timing helper used by double tap.
+  - `0x5f30` — smart-tap eligibility helper.
+- These are candidate addresses inferred from direct call targets in the successful run #4 pseudocode. REA must resolve each address as a procedure; unresolved/non-entry addresses will be recorded as such rather than assumed to be functions.
+- This batch has been prepared but not yet run. It continues to use one persistent REA MCP session and does not alter the original binary or build the tweak.
