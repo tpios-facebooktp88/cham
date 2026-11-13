@@ -517,3 +517,13 @@ The user confirmed that only POINT mode is currently needed. Other Tap modes and
 - User must build this revision and test: POINT click, STOP/release, saved coordinates and point list after closing/reopening the panel, and settings after terminating/relaunching the app.
 - Do not mark the refreshed UI/persistence as device-verified until the user confirms it.
 - The previous confirmed working touch baseline remains `398054e`; if POINT stops working, compare the backend against that exact baseline before changing touch logic.
+
+### Final static verification after cleanup
+
+- Re-fetched the updated source from `main`.
+- Confirmed no legacy mode enum/branch names remain in the active scheduler, overlay, or touch backend source.
+- Confirmed the mode picker and OCR source references are absent; both OCR matcher files are deleted and the Makefile no longer compiles them.
+- Confirmed the settings store covers point coordinates/list, interval, press duration, floating-handle position, panel position, and panel scale.
+- Confirmed balanced Objective-C delimiters in the rewritten scheduler header/implementation and overlay source.
+- Confirmed `Cham/CHMTouchBackend.m` is byte-for-byte represented by the same Git blob SHA as the known-good touch backend (`51fd6a2ad99d57a1f896b8c4c32dad0666a9fd29`); the IOKit constructor and UIKit `sendEvent:` path remain present.
+- These are static checks only, not a compiler result. Build and relaunch persistence remain pending user validation.
