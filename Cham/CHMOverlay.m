@@ -4,7 +4,7 @@
 static NSString * const CHMSettingsKey = @"com.cham.autoclicker.settings.v1";
 static NSInteger const CHMOverlayTag = 0x43484D;
 
-@interface CHMOverlay ()
+@interface CHMOverlay () <UITextFieldDelegate>
 @property (nonatomic, weak) UIWindow *hostWindow;
 @property (nonatomic, strong) UIButton *handle;
 @property (nonatomic, strong) UIView *panel;
@@ -14,7 +14,7 @@ static NSInteger const CHMOverlayTag = 0x43484D;
 @property (nonatomic, strong) UITextField *yField;
 @property (nonatomic, strong) UITextField *intervalField;
 @property (nonatomic, strong) UISlider *touchTimeSlider;
-@property (nonatomic, strong) UILabel *touchTimeLabel;
+@property (nonatomic, strong) UITextField *touchTimeField;
 @property (nonatomic, strong) NSMutableArray<NSValue *> *points;
 @property (nonatomic, strong) NSMutableArray<UIView *> *pointMarkers;
 @property (nonatomic, strong) CHMTapScheduler *scheduler;
@@ -238,11 +238,6 @@ static NSInteger const CHMOverlayTag = 0x43484D;
     [self.hostWindow addSubview:panel];
     self.panel = panel;
 
-    UIView *accent = [[UIView alloc] initWithFrame:CGRectMake(0, 0, width, 4)];
-    accent.backgroundColor = [UIColor colorWithRed:0.40 green:0.34 blue:1.0 alpha:1.0];
-    accent.layer.cornerRadius = 2.0;
-    [panel addSubview:accent];
-
     UILabel *title = [self label:@"CHAM  /  POINT" frame:CGRectMake(16, 12, width - 126, 26)];
     title.font = [UIFont boldSystemFontOfSize:15.0];
     title.userInteractionEnabled = YES;
@@ -272,7 +267,7 @@ static NSInteger const CHMOverlayTag = 0x43484D;
     [panel addSubview:self.xField];
     [panel addSubview:self.yField];
 
-    UILabel *intervalTitle = [self label:@"INTERVAL  (SECONDS)" frame:CGRectMake(16, 122, 150, 18)];
+    UILabel *intervalTitle = [self label:@"DELAY BETWEEN TAPS  (SEC)" frame:CGRectMake(16, 122, 150, 18)];
     intervalTitle.textColor = [UIColor colorWithWhite:1.0 alpha:0.68];
     intervalTitle.font = [UIFont boldSystemFontOfSize:10.0];
     [panel addSubview:intervalTitle];
@@ -281,7 +276,7 @@ static NSInteger const CHMOverlayTag = 0x43484D;
                                 frame:CGRectMake(16, 144, 104, 36)];
     [panel addSubview:self.intervalField];
 
-    UILabel *touchTitle = [self label:@"PRESS DURATION" frame:CGRectMake(140, 122, width - 156, 18)];
+    UILabel *touchTitle = [self label:@"PRESS DURATION  (MS)" frame:CGRectMake(140, 122, width - 156, 18)];
     touchTitle.textColor = [UIColor colorWithWhite:1.0 alpha:0.68];
     touchTitle.font = [UIFont boldSystemFontOfSize:10.0];
     [panel addSubview:touchTitle];
@@ -292,12 +287,12 @@ static NSInteger const CHMOverlayTag = 0x43484D;
         ? [saved[@"touchTime"] floatValue] : 60.0f;
     [self.touchTimeSlider addTarget:self action:@selector(touchTimeChanged:) forControlEvents:UIControlEventValueChanged];
     [panel addSubview:self.touchTimeSlider];
-    self.touchTimeLabel = [self label:[NSString stringWithFormat:@"%.1f ms", self.touchTimeSlider.value]
-                                frame:CGRectMake(width - 64, 179, 48, 18)];
-    self.touchTimeLabel.font = [UIFont systemFontOfSize:10.0 weight:UIFontWeightMedium];
-    self.touchTimeLabel.textAlignment = NSTextAlignmentRight;
-    self.touchTimeLabel.textColor = [UIColor colorWithWhite:1.0 alpha:0.72];
-    [panel addSubview:self.touchTimeLabel];
+    self.touchTimeField = [self field:[NSString stringWithFormat:@"%.1f", self.touchTimeSlider.value]
+                                frame:CGRectMake(width - 92, 178, 76, 28)];
+    self.touchTimeField.font = [UIFont monospacedDigitSystemFontOfSize:12.0 weight:UIFontWeightSemibold];
+    self.touchTimeField.delegate = self;
+    [self.touchTimeField addTarget:self action:@selector(touchTimeFieldEdited:) forControlEvents:UIControlEventEditingChanged];
+    [panel addSubview:self.touchTimeField];
 
     [panel addSubview:[self button:@"ADD POINT" frame:CGRectMake(16, 202, (width - 44) / 2, 34)
                               color:[UIColor colorWithRed:0.24 green:0.32 blue:0.82 alpha:1.0] action:@selector(addPoint)]];
@@ -397,7 +392,25 @@ static NSInteger const CHMOverlayTag = 0x43484D;
 }
 
 - (void)touchTimeChanged:(UISlider *)slider {
-    self.touchTimeLabel.text = [NSString stringWithFormat:@"%.1f ms", slider.value];
+    float value = roundf(slider.value * 10.0f) / 10.0f;
+    slider.value = value;
+    self.touchTimeField.text = [NSString stringWithFormat:@"%.1f", value];
+    [self saveSettings];
+}
+
+- (void)touchTimeFieldEdited:(UITextField *)field {
+    NSString *text = field.text;
+    if (text.length == 0 || [text isEqualToString:@"."]) return;
+    float value = MIN(1000.0f, MAX(0.1f, text.floatValue));
+    self.touchTimeSlider.value = value;
+    [self saveSettings];
+}
+
+- (void)textFieldDidEndEditing:(UITextField *)field {
+    if (field != self.touchTimeField) return;
+    float value = MIN(1000.0f, MAX(0.1f, field.text.floatValue));
+    self.touchTimeSlider.value = value;
+    field.text = [NSString stringWithFormat:@"%.1f", value];
     [self saveSettings];
 }
 
