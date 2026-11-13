@@ -18,7 +18,6 @@
         }
         if (window) break;
     }
-    if (!window) window = UIApplication.sharedApplication.keyWindow;
     if (!window || self.handle) return;
 
     self.hostWindow = window;
