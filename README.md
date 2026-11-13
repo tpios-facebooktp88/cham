@@ -18,4 +18,4 @@ A lightweight iOS POINT auto-clicker tweak for TrollStore + TrollFools.
 The Theos build workflow is manual-only. Do not run it unless the user explicitly authorizes it. The user normally runs builds and device tests.
 
 ## Preservation
-The original `Cham.dylib` is preserved unchanged and is not a build input. Completed REA research workflow, runner, and report have been removed from this repository; no REA analysis is part of the normal build.
+The original `Cham.dylib` is preserved unchanged and is not a build input.
