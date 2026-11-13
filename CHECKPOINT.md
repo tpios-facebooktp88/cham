@@ -325,3 +325,46 @@ These are source-level compile-risk corrections found by scanning every current 
 - During DOWN hit-testing, the backend now temporarily hides all tagged direct subviews of the host window, resolves the underlying app view, then restores each overlay's visibility. The rest of the HID dispatch path and scheduler timing are unchanged.
 - This is a source-level routing correction. It has not been compiled or device-validated; user must rebuild and test START on a clear target-app control. If it still does nothing, next investigation is the unresolved window-local versus HID screen-coordinate contract and runtime HID dispatch diagnostics.
 - Source commits: overlay `8b8b2e0ebf633022188ea9554d940d2109ceb8f7`; backend `8314410603b225f241746c59c8a71279efbb30ac`.
+
+
+## Post-REA source alignment audit — 2026-11-13
+
+Compared the current `main` source against the final REA/Ghidra baseline. This is a static source review only; no source code or binary was changed in this audit.
+
+### Tap Mode alignment
+
+| Mode / capability | Current source behavior | REA evidence | Assessment |
+|---|---|---|---|
+| POINT | One DOWN/UP pair per configured point | Normal tap path uses phase 0 then completion phase | Basic path represented; runtime unverified |
+| DOUBLE | Two sequential tap pairs with configurable gap | Double-tap callback chain starts a second touch after a delay | Broadly aligned; exact timing still unverified |
+| HOLD | One DOWN held for the configured duration, then UP | Hold setting feeds a separate duration path | Broadly aligned; runtime unverified |
+| HUMAN | Randomizes the interval by 0.8–1.2 | A numeric mode case randomizes X/Y by -5…+5 and duration by 0.80–1.20; visible HUMAN label-to-case mapping is not proven | Not equivalent; do not claim complete |
+| EXTREME | Caps the interval at 30 ms | Reference selects a burst of 1–4 instant taps using timing thresholds | Not equivalent |
+| ULTRA | Caps the interval at 10 ms | Reference invokes an instant-tap path; repeat cadence is controlled by its caller | Not equivalent |
+| Multiple points | Sequential taps using one fixed finger index | Reference has a configured-point sequence path; explicit touch IDs exist, but full simultaneous multi-touch is not established | Sequential multi-point only; simultaneous multi-touch not implemented |
+
+### Other feature gaps
+
+- Recorder: current repository has no capture, event serialization, persistence, or replay implementation. REA identified UI handlers and call targets, but the recorder core was not decompiled in the final batch. Do not invent the recording file format from the `acp_recording.bin` string.
+- Smart OCR: current repository has text matching primitives only. Vision image capture, recognition requests, scan scheduling, cooldown execution, ROI-to-image conversion, and result dispatch are not implemented.
+- Touch backend: source contains the HID/UIKit bridge and preserves the DOWN target context for UP. This remains unbuilt and unvalidated on an iOS 16 device.
+- Coordinate contract: current overlay points are window-local and the same numeric point is passed to HID coordinates. Original-binary selector evidence shows explicit window/screen conversion exists somewhere, but its exact call path is unresolved. Do not change coordinate conversion by guesswork.
+- Lifecycle: the overlay stops on scene deactivation; if release cannot be dispatched, the state remains blocked. This is a source safeguard, not proof of successful OS-level release.
+
+### Recommended implementation order
+
+1. Close the Tap Mode mapping gap from the already-saved REA artifact before changing mode behavior. In particular, prove the UI enum/selector mapping for HUMAN, EXTREME and ULTRA.
+2. Resolve the coordinate conversion path from existing binary evidence before changing HID coordinates.
+3. Keep the current DOWN/UP safety invariant: never send a new DOWN while the prior contact remains unconfirmed.
+4. Only then implement the smallest mode-specific scheduler changes, without touching the original binary.
+5. Recorder and OCR remain separate phases; implement neither from UI strings alone. First establish their internal data/recognition paths from evidence already available.
+6. User performs all builds and device tests. Do not run Actions, Theos, or Codemagic without explicit permission.
+
+### Acceptance status
+
+- Static source alignment audit: complete.
+- Tap Mode feature parity: incomplete.
+- Recorder: not implemented.
+- Vision OCR engine: not implemented.
+- iOS 16 device validation: outstanding.
+- Original `Cham.dylib`: preserved unchanged.
